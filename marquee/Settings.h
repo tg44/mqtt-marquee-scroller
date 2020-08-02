@@ -50,7 +50,6 @@ SOFTWARE.
 #include "TimeDB.h"
 #include "NewsApiClient.h" 
 #include "OctoPrintClient.h"
-#include "BitcoinApiClient.h"
 #include "PiHoleClient.h"
 
 //******************************

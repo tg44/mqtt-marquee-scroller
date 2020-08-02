@@ -90,9 +90,6 @@ int printerCount = 0;
 // Pi-hole Client
 PiHoleClient piholeClient;
 
-// Bitcoin Client
-BitcoinApiClient bitcoinClient;
-
 ESP8266WebServer server(WEBSERVER_PORT);
 ESP8266HTTPUpdateServer serverUpdater;
 
@@ -308,7 +305,6 @@ void setup() {
     server.on("/", displayWeatherData);
     server.on("/pull", handlePull);
     server.on("/locations", handleLocations);
-    server.on("/savebitcoin", handleSaveBitcoin);
     server.on("/savewideclock", handleSaveWideClock);
     server.on("/savenews", handleSaveNews);
     server.on("/saveoctoprint", handleSaveOctoprint);
@@ -423,9 +419,6 @@ void loop() {
         msg += "  " + printerClient.getFileName() + " ";
         msg += "(" + printerClient.getProgressCompletion() + "%)  ";
       }
-      if (BitcoinCurrencyCode != "NONE" && BitcoinCurrencyCode != "") {
-        msg += "  Bitcoin: " + bitcoinClient.getRate() + " " + bitcoinClient.getCode() + " ";
-      }
       if (USE_PIHOLE) {
         piholeClient.getPiHoleData(PiHoleServer, PiHolePort);
         piholeClient.getGraphData(PiHoleServer, PiHolePort);
@@ -496,16 +489,6 @@ boolean athentication() {
 void handlePull() {
   getWeatherData(); // this will force a data pull for new weather
   displayWeatherData();
-}
-
-void handleSaveBitcoin() {
-  if (!athentication()) {
-    return server.requestAuthentication();
-  }
-  BitcoinCurrencyCode = server.arg("bitcoincurrency");
-  writeCityIds();
-  bitcoinClient.updateBitcoinData(BitcoinCurrencyCode);  // does nothing if BitCoinCurrencyCode is "NONE" or empty
-  redirectHome();
 }
 
 void handleSaveWideClock() {
@@ -977,10 +960,6 @@ void getWeatherData() //client function to send/receive GET request data.
     newsClient.updateNews();
   }
 
-  if (displayOn) {
-    bitcoinClient.updateBitcoinData(BitcoinCurrencyCode);  // does nothing if BitCoinCurrencyCode is "NONE" or empty
-  }
-
   Serial.println("Version: " + String(VERSION));
   Serial.println();
   digitalWrite(externalLight, HIGH);
@@ -1138,12 +1117,6 @@ void displayWeatherData() {
       html += "Not Connected";
     }
     html += "</div><br><hr>";
-    server.sendContent(String(html));
-    html = "";
-  }
-
-  if (BitcoinCurrencyCode != "NONE" && BitcoinCurrencyCode != "") {
-    html = "<div class='w3-cell-row'>Bitcoin value: " + bitcoinClient.getRate() + " " + bitcoinClient.getCode() + "</div><br><hr>";
     server.sendContent(String(html));
     html = "";
   }
