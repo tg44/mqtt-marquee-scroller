@@ -71,10 +71,6 @@ int minutesBetweenScrolling = 1; // Time in minutes between scrolling data (defa
 int displayScrollSpeed = 25; // In milliseconds -- Configurable by the web UI (slow = 35, normal = 25, fast = 15, very fast = 5)
 boolean flashOnSeconds = true; // when true the : character in the time will flash on and off as a seconds indicator
 
-boolean NEWS_ENABLED = true;
-String NEWS_API_KEY = ""; // Get your News API Key from https://newsapi.org
-String NEWS_SOURCE = "reuters";  // https://newsapi.org/sources to get full list of news sources available
-
 // Display Settings
 // CLK -> D5 (SCK)  
 // CS  -> D6 
@@ -93,23 +89,6 @@ int ledRotation = 3;
 
 String timeDisplayTurnsOn = "06:30";  // 24 Hour Format HH:MM -- Leave blank for always on. (ie 05:30)
 String timeDisplayTurnsOff = "23:00"; // 24 Hour Format HH:MM -- Leave blank for always on. Both must be set to work.
-
-// OctoPrint Monitoring -- Monitor your 3D printer OctoPrint Server
-boolean OCTOPRINT_ENABLED = false;
-boolean OCTOPRINT_PROGRESS = true;
-String OctoPrintApiKey = "";  // ApiKey from your User Account on OctoPrint
-String OctoPrintServer = "";  // IP or Address of your OctoPrint Server (DO NOT include http://)
-int OctoPrintPort = 80;       // the port you are running your OctoPrint server on (usually 80);
-String OctoAuthUser = "";     // only used if you have haproxy or basic athentintication turned on (not default)
-String OctoAuthPass = "";     // only used with haproxy or basic auth (only needed if you must authenticate)
-
-// Bitcoin Client - NONE or empty is off
-String BitcoinCurrencyCode = "NONE";  // Change to USD, GBD, EUR, or NONE -- this can be managed in the Web Interface
-
-// Pi-hole Client -- monitor basic stats from your Pi-hole server (see http://pi-hole.net)
-boolean USE_PIHOLE = false;   // Set true to display your Pi-hole details
-String PiHoleServer = "";     // IP or Address only (DO NOT include http://)
-int PiHolePort = 80;          // Port of your Pi-hole address (default 80)
 
 boolean ENABLE_OTA = true;    // this will allow you to load firmware to the device over WiFi (see OTA for ESP8266)
 String OTA_Password = "";     // Set an OTA password here -- leave blank if you don't want to be prompted for password
