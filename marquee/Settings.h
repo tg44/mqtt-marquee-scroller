@@ -48,9 +48,6 @@ SOFTWARE.
 #include <pgmspace.h>
 #include "OpenWeatherMapClient.h"
 #include "TimeDB.h"
-#include "NewsApiClient.h" 
-#include "OctoPrintClient.h"
-#include "PiHoleClient.h"
 
 //******************************
 // Start Settings

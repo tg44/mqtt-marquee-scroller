@@ -67,10 +67,6 @@ long firstEpoch = 0;
 long displayOffEpoch = 0;
 boolean displayOn = true;
 
-// News Client
-NewsApiClient newsClient(NEWS_API_KEY, NEWS_SOURCE);
-int newsIndex = 0;
-
 // Weather Client
 OpenWeatherMapClient weatherClient(APIKEY, CityIDs, 1, IS_METRIC);
 // (some) Default Weather Settings
@@ -82,13 +78,6 @@ boolean SHOW_WIND = true;
 boolean SHOW_WINDDIR = true;
 boolean SHOW_PRESSURE = false;
 boolean SHOW_HIGHLOW = true;
-
-// OctoPrint Client
-OctoPrintClient printerClient(OctoPrintApiKey, OctoPrintServer, OctoPrintPort, OctoAuthUser, OctoAuthPass);
-int printerCount = 0;
-
-// Pi-hole Client
-PiHoleClient piholeClient;
 
 ESP8266WebServer server(WEBSERVER_PORT);
 ESP8266HTTPUpdateServer serverUpdater;
@@ -306,9 +295,6 @@ void setup() {
     server.on("/pull", handlePull);
     server.on("/locations", handleLocations);
     server.on("/savewideclock", handleSaveWideClock);
-    server.on("/savenews", handleSaveNews);
-    server.on("/saveoctoprint", handleSaveOctoprint);
-    server.on("/savepihole", handleSavePihole);
     server.on("/systemreset", handleSystemReset);
     server.on("/forgetwifi", handleForgetWifi);
     server.on("/configure", handleConfigure);
@@ -357,17 +343,6 @@ void loop() {
       matrix.shutdown(false);
     }
     matrix.fillScreen(LOW); // show black
-    if (OCTOPRINT_ENABLED) {
-      if (displayOn && ((printerClient.isOperational() || printerClient.isPrinting()) || printerCount == 0)) {
-        // This should only get called if the printer is actually running or if it has been 2 minutes since last check
-        printerClient.getPrinterJobResults();
-      }
-      printerCount += 1;
-      if (printerCount > 2) {
-        printerCount = 0;
-      }
-    }
-
     displayRefreshCount --;
     // Check to see if we need to Scroll some Data
     if (displayRefreshCount <= 0) {
@@ -407,28 +382,7 @@ void loop() {
       }
      
       msg += marqueeMessage + " ";
-      
-      if (NEWS_ENABLED) {
-        msg += "  " + NEWS_SOURCE + ": " + newsClient.getTitle(newsIndex) + "  ";
-        newsIndex += 1;
-        if (newsIndex > 9) {
-          newsIndex = 0;
-        }
-      }
-      if (OCTOPRINT_ENABLED && printerClient.isPrinting()) {
-        msg += "  " + printerClient.getFileName() + " ";
-        msg += "(" + printerClient.getProgressCompletion() + "%)  ";
-      }
-      if (USE_PIHOLE) {
-        piholeClient.getPiHoleData(PiHoleServer, PiHolePort);
-        piholeClient.getGraphData(PiHoleServer, PiHolePort);
-        if (piholeClient.getPiHoleStatus() != "") {
-          msg += "    Pi-hole (" + piholeClient.getPiHoleStatus() + "): " + piholeClient.getAdsPercentageToday() + "% "; 
-        }
-      }
-
       scrollMessage(msg);
-      drawPiholeGraph();
     }
   }
 
@@ -499,53 +453,6 @@ void handleSaveWideClock() {
     Wide_Clock_Style = server.arg("wideclockformat");
     writeCityIds();
     matrix.fillScreen(LOW); // show black
-  }
-  redirectHome();
-}
-
-void handleSaveNews() {
-  if (!athentication()) {
-    return server.requestAuthentication();
-  }
-  NEWS_ENABLED = server.hasArg("displaynews");
-  NEWS_API_KEY = server.arg("newsApiKey");
-  NEWS_SOURCE = server.arg("newssource");
-  matrix.fillScreen(LOW); // show black
-  writeCityIds();
-  newsClient.updateNews();
-  redirectHome();
-}
-
-void handleSaveOctoprint() {
-  if (!athentication()) {
-    return server.requestAuthentication();
-  }
-  OCTOPRINT_ENABLED = server.hasArg("displayoctoprint");
-  OCTOPRINT_PROGRESS = server.hasArg("octoprintprogress");
-  OctoPrintApiKey = server.arg("octoPrintApiKey");
-  OctoPrintServer = server.arg("octoPrintAddress");
-  OctoPrintPort = server.arg("octoPrintPort").toInt();
-  OctoAuthUser = server.arg("octoUser");
-  OctoAuthPass = server.arg("octoPass");
-  matrix.fillScreen(LOW); // show black
-  writeCityIds();
-  if (OCTOPRINT_ENABLED) {
-    printerClient.getPrinterJobResults();
-  }
-  redirectHome();
-}
-
-void handleSavePihole() {
-  if (!athentication()) {
-    return server.requestAuthentication();
-  }
-  USE_PIHOLE = server.hasArg("displaypihole");
-  PiHoleServer = server.arg("piholeAddress");
-  PiHolePort = server.arg("piholePort").toInt();
-  writeCityIds();
-  if (USE_PIHOLE) {
-    piholeClient.getPiHoleData(PiHoleServer, PiHolePort);
-    piholeClient.getGraphData(PiHoleServer, PiHolePort);
   }
   redirectHome();
 }
@@ -951,15 +858,6 @@ void getWeatherData() //client function to send/receive GET request data.
     Serial.println("firstEpoch is: " + String(firstEpoch));
   }
 
-  if (NEWS_ENABLED && displayOn) {
-    matrix.drawPixel(0, 2, HIGH);
-    matrix.drawPixel(0, 1, HIGH);
-    matrix.drawPixel(0, 0, HIGH);
-    matrix.write();
-    Serial.println("Getting News Data for " + NEWS_SOURCE);
-    newsClient.updateNews();
-  }
-
   Serial.println("Version: " + String(VERSION));
   Serial.println();
   digitalWrite(externalLight, HIGH);
@@ -1103,58 +1001,6 @@ void displayWeatherData() {
 
   server.sendContent(String(html)); // spit out what we got
   html = ""; // fresh start
-
-
-  if (OCTOPRINT_ENABLED) {
-    html = "<div class='w3-cell-row'>OctoPrint Status: ";
-    if (printerClient.isPrinting()) {
-      html += printerClient.getState() + " " + printerClient.getFileName() + " (" + printerClient.getProgressCompletion() + "%)";
-    } else if (printerClient.isOperational()) {
-      html += printerClient.getState();
-    } else if (printerClient.getError() != "") {
-      html += printerClient.getError();
-    } else {
-      html += "Not Connected";
-    }
-    html += "</div><br><hr>";
-    server.sendContent(String(html));
-    html = "";
-  }
-
-  if (USE_PIHOLE) {
-    if (piholeClient.getError() == "") {
-      html = "<div class='w3-cell-row'><b>Pi-hole</b><br>"
-             "Total Queries (" + piholeClient.getUniqueClients() + " clients): <b>" + piholeClient.getDnsQueriesToday() + "</b><br>"
-             "Queries Blocked: <b>" + piholeClient.getAdsBlockedToday() + "</b><br>"
-             "Percent Blocked: <b>" + piholeClient.getAdsPercentageToday() + "%</b><br>"
-             "Domains on Blocklist: <b>" + piholeClient.getDomainsBeingBlocked() + "</b><br>"
-             "Status: <b>" + piholeClient.getPiHoleStatus() + "</b><br>"
-             "</div><br><hr>";
-    } else {
-      html = "<div class='w3-cell-row'>Pi-hole Error";
-      html += "Please <a href='/configurepihole' title='Configure'>Configure</a> for Pi-hole <a href='/configurepihole' title='Configure'><i class='fas fa-cog'></i></a><br>";
-      html += "Status: Error Getting Data<br>";
-      html += "Reason: " + piholeClient.getError() + "<br></div><br><hr>";
-    }
-    server.sendContent(html);
-    html = "";
-  }
-
-  if (NEWS_ENABLED) {
-    html = "<div class='w3-cell-row' style='width:100%'><h2>News (" + NEWS_SOURCE + ")</h2></div>";
-    if (newsClient.getTitle(0) == "") {
-      html += "<p>Please <a href='/configurenews'>Configure News</a> API</p>";
-      server.sendContent(html);
-      html = "";
-    } else {
-      for (int inx = 0; inx < 10; inx++) {
-        html = "<div class='w3-cell-row'><a href='" + newsClient.getUrl(inx) + "' target='_BLANK'>" + newsClient.getTitle(inx) + "</a></div>";
-        html += newsClient.getDescription(inx) + "<br/><br/>";
-        server.sendContent(html);
-        html = "";
-      }
-    }
-  }
 
   sendFooter();
   server.sendContent("");
@@ -1371,20 +1217,6 @@ void readCityIds() {
       CityIDs[0] = line.substring(line.lastIndexOf("CityID=") + 7).toInt();
       Serial.println("CityID: " + String(CityIDs[0]));
     }
-    if (line.indexOf("newsSource=") >= 0) {
-      NEWS_SOURCE = line.substring(line.lastIndexOf("newsSource=") + 11);
-      NEWS_SOURCE.trim();
-      Serial.println("newsSource=" + NEWS_SOURCE);
-    }
-    if (line.indexOf("isNews=") >= 0) {
-      NEWS_ENABLED = line.substring(line.lastIndexOf("isNews=") + 7).toInt();
-      Serial.println("NEWS_ENABLED=" + String(NEWS_ENABLED));
-    }
-    if (line.indexOf("newsApiKey=") >= 0) {
-      NEWS_API_KEY = line.substring(line.lastIndexOf("newsApiKey=") + 11);
-      NEWS_API_KEY.trim();
-      Serial.println("NEWS_API_KEY: " + NEWS_API_KEY);
-    }
     if (line.indexOf("isFlash=") >= 0) {
       flashOnSeconds = line.substring(line.lastIndexOf("isFlash=") + 8).toInt();
       Serial.println("flashOnSeconds=" + String(flashOnSeconds));
@@ -1441,38 +1273,6 @@ void readCityIds() {
       displayScrollSpeed = line.substring(line.lastIndexOf("scrollSpeed=") + 12).toInt();
       Serial.println("displayScrollSpeed=" + String(displayScrollSpeed));
     }
-    if (line.indexOf("isOctoPrint=") >= 0) {
-      OCTOPRINT_ENABLED = line.substring(line.lastIndexOf("isOctoPrint=") + 12).toInt();
-      Serial.println("OCTOPRINT_ENABLED=" + String(OCTOPRINT_ENABLED));
-    }
-    if (line.indexOf("isOctoProgress=") >= 0) {
-      OCTOPRINT_PROGRESS = line.substring(line.lastIndexOf("isOctoProgress=") + 15).toInt();
-      Serial.println("OCTOPRINT_PROGRESS=" + String(OCTOPRINT_PROGRESS));
-    }
-    if (line.indexOf("octoKey=") >= 0) {
-      OctoPrintApiKey = line.substring(line.lastIndexOf("octoKey=") + 8);
-      OctoPrintApiKey.trim();
-      Serial.println("OctoPrintApiKey=" + OctoPrintApiKey);
-    }
-    if (line.indexOf("octoServer=") >= 0) {
-      OctoPrintServer = line.substring(line.lastIndexOf("octoServer=") + 11);
-      OctoPrintServer.trim();
-      Serial.println("OctoPrintServer=" + OctoPrintServer);
-    }
-    if (line.indexOf("octoPort=") >= 0) {
-      OctoPrintPort = line.substring(line.lastIndexOf("octoPort=") + 9).toInt();
-      Serial.println("OctoPrintPort=" + String(OctoPrintPort));
-    }
-    if (line.indexOf("octoUser=") >= 0) {
-      OctoAuthUser = line.substring(line.lastIndexOf("octoUser=") + 9);
-      OctoAuthUser.trim();
-      Serial.println("OctoAuthUser=" + OctoAuthUser);
-    }
-    if (line.indexOf("octoPass=") >= 0) {
-      OctoAuthPass = line.substring(line.lastIndexOf("octoPass=") + 9);
-      OctoAuthPass.trim();
-      Serial.println("OctoAuthPass=" + OctoAuthPass);
-    }
     if (line.indexOf("www_username=") >= 0) {
       String temp = line.substring(line.lastIndexOf("www_username=") + 13);
       temp.trim();
@@ -1488,11 +1288,6 @@ void readCityIds() {
     if (line.indexOf("IS_BASIC_AUTH=") >= 0) {
       IS_BASIC_AUTH = line.substring(line.lastIndexOf("IS_BASIC_AUTH=") + 14).toInt();
       Serial.println("IS_BASIC_AUTH=" + String(IS_BASIC_AUTH));
-    }
-    if (line.indexOf("BitcoinCurrencyCode=") >= 0) {
-      BitcoinCurrencyCode = line.substring(line.lastIndexOf("BitcoinCurrencyCode=") + 20);
-      BitcoinCurrencyCode.trim();
-      Serial.println("BitcoinCurrencyCode=" + BitcoinCurrencyCode);
     }
     if (line.indexOf("SHOW_CITY=") >= 0) {
       SHOW_CITY = line.substring(line.lastIndexOf("SHOW_CITY=") + 10).toInt();
@@ -1524,27 +1319,12 @@ void readCityIds() {
       SHOW_DATE = line.substring(line.lastIndexOf("SHOW_DATE=") + 10).toInt();
       Serial.println("SHOW_DATE=" + String(SHOW_DATE));
     }
-    if (line.indexOf("USE_PIHOLE=") >= 0) {
-      USE_PIHOLE = line.substring(line.lastIndexOf("USE_PIHOLE=") + 11).toInt();
-      Serial.println("USE_PIHOLE=" + String(USE_PIHOLE));
-    }
-    if (line.indexOf("PiHoleServer=") >= 0) {
-      PiHoleServer = line.substring(line.lastIndexOf("PiHoleServer=") + 13);
-      PiHoleServer.trim();
-      Serial.println("PiHoleServer=" + PiHoleServer);
-    }
-    if (line.indexOf("PiHolePort=") >= 0) {
-      PiHolePort = line.substring(line.lastIndexOf("PiHolePort=") + 11).toInt();
-      Serial.println("PiHolePort=" + String(PiHolePort));
-    }
   }
   fr.close();
   matrix.setIntensity(displayIntensity);
-  newsClient.updateNewsClient(NEWS_API_KEY, NEWS_SOURCE);
   weatherClient.updateWeatherApiKey(APIKEY);
   weatherClient.setMetric(IS_METRIC);
   weatherClient.updateCityIdList(CityIDs, 1);
-  printerClient.updateOctoPrintClient(OctoPrintApiKey, OctoPrintServer, OctoPrintPort, OctoAuthUser, OctoAuthPass);
 }
 
 void scrollMessage(String msg) {
@@ -1579,52 +1359,6 @@ void scrollMessage(String msg) {
   matrix.setCursor(0, 0);
 }
 
-void drawPiholeGraph() {
-  if (!USE_PIHOLE || piholeClient.getBlockedCount() == 0) {
-    return;
-  }
-  int count = piholeClient.getBlockedCount();
-  int high = 0;
-  int row = matrix.width() - 1;
-  int yval = 0;
-
-  int totalRows = count - matrix.width();
-  
-  if (totalRows < 0) {
-    totalRows = 0;
-  }
-
-  // get the high value for the sample that will be on the screen
-  for (int inx = count; inx >= totalRows; inx--) {
-    if (piholeClient.getBlockedAds()[inx] > high) {
-      high = (int)piholeClient.getBlockedAds()[inx];
-    }
-  }
-
-  int currentVal = 0;
-  for (int inx = (count-1); inx >= totalRows; inx--) {
-    currentVal = (int)piholeClient.getBlockedAds()[inx];
-    yval = map(currentVal, 0, high, 7, 0);
-    //Serial.println("Value: " + String(currentVal));
-    //Serial.println("x: " + String(row) + " y:" + String(yval) + " h:" + String(8-yval));
-    matrix.drawFastVLine(row, yval, 8-yval, HIGH);
-    if (row == 0) {
-      break;
-    }
-    row--;
-  }
-  matrix.write();
-  for (int wait = 0; wait < 500; wait++) {
-    if (WEBSERVER_ENABLED) {
-      server.handleClient();
-    }
-    if (ENABLE_OTA) {
-      ArduinoOTA.handle();
-    }
-    delay(20);
-  }
-}
-
 void centerPrint(String msg) {
   centerPrint(msg, false);
 }
@@ -1637,12 +1371,6 @@ void centerPrint(String msg, boolean extraStuff) {
     if (!IS_24HOUR && IS_PM && isPM()) {
       matrix.drawPixel(matrix.width() - 1, 6, HIGH);
     }
-
-    if (OCTOPRINT_ENABLED && OCTOPRINT_PROGRESS && printerClient.isPrinting()) {
-      int numberOfLightPixels = (printerClient.getProgressCompletion().toFloat() / float(100)) * (matrix.width() - 1);
-      matrix.drawFastHLine(0, 7, numberOfLightPixels, HIGH);
-    }
-    
   }
   
   matrix.setCursor(x, 0);
