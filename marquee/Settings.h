@@ -48,6 +48,7 @@ SOFTWARE.
 #include <pgmspace.h>
 #include "OpenWeatherMapClient.h"
 #include "TimeDB.h"
+#include "MqttClient.h"
 
 //******************************
 // Start Settings
@@ -92,6 +93,15 @@ String timeDisplayTurnsOff = "23:00"; // 24 Hour Format HH:MM -- Leave blank for
 
 boolean ENABLE_OTA = true;    // this will allow you to load firmware to the device over WiFi (see OTA for ESP8266)
 String OTA_Password = "";     // Set an OTA password here -- leave blank if you don't want to be prompted for password
+
+/*
+MQTT settings
+*/
+boolean ENABLE_MQTT = false;
+String mqttUrl = "";
+int mqttPort = 1883;
+String mqttTopic = ""; 
+String mqttDeviceId = "marquee-scroller";
 
 //******************************
 // End Settings

@@ -67,6 +67,9 @@ long firstEpoch = 0;
 long displayOffEpoch = 0;
 boolean displayOn = true;
 
+//MQTT client
+MqttClient mqttClient = MqttClient();
+
 // Weather Client
 OpenWeatherMapClient weatherClient(APIKEY, CityIDs, 1, IS_METRIC);
 // (some) Default Weather Settings
@@ -83,12 +86,9 @@ ESP8266WebServer server(WEBSERVER_PORT);
 ESP8266HTTPUpdateServer serverUpdater;
 
 static const char WEB_ACTIONS1[] PROGMEM = "<a class='w3-bar-item w3-button' href='/'><i class='fas fa-home'></i> Home</a>"
-                        "<a class='w3-bar-item w3-button' href='/configure'><i class='fas fa-cog'></i> Configure</a>"
-                        "<a class='w3-bar-item w3-button' href='/configurenews'><i class='far fa-newspaper'></i> News</a>"
-                        "<a class='w3-bar-item w3-button' href='/configureoctoprint'><i class='fas fa-cube'></i> OctoPrint</a>";
+                        "<a class='w3-bar-item w3-button' href='/configure'><i class='fas fa-cog'></i> Configure</a>";
 
-static const char WEB_ACTIONS2[] PROGMEM = "<a class='w3-bar-item w3-button' href='/configurebitcoin'><i class='fab fa-bitcoin'></i> Bitcoin</a>"
-                        "<a class='w3-bar-item w3-button' href='/configurepihole'><i class='fas fa-network-wired'></i> Pi-hole</a>"
+static const char WEB_ACTIONS2[] PROGMEM = "<a class='w3-bar-item w3-button' href='/configuremqtt'><i class='fab fa-stream'></i> MQTT</a>"
                         "<a class='w3-bar-item w3-button' href='/pull'><i class='fas fa-cloud-download-alt'></i> Refresh Data</a>"
                         "<a class='w3-bar-item w3-button' href='/display'>";
 
@@ -130,57 +130,16 @@ static const char CHANGE_FORM3[] PROGMEM = "<hr><p><input name='isBasicAuth' cla
                       "<p><button class='w3-button w3-block w3-green w3-section w3-padding' type='submit'>Save</button></p></form>"
                       "<script>function isNumberKey(e){var h=e.which?e.which:event.keyCode;return!(h>31&&(h<48||h>57))}</script>";
 
-static const char BITCOIN_FORM[] PROGMEM = "<form class='w3-container' action='/savebitcoin' method='get'><h2>Bitcoin Configuration:</h2>"
-                        "<p>Select Bitcoin Currency <select class='w3-option w3-padding' name='bitcoincurrency'>%BITCOINOPTIONS%</select></p>"
-                        "<button class='w3-button w3-block w3-grey w3-section w3-padding' type='submit'>Save</button></form>";
-
-static const char CURRENCY_OPTIONS[] PROGMEM = "<option value='NONE'>NONE</option>"
-                          "<option value='USD'>United States Dollar</option>"
-                          "<option value='AUD'>Australian Dollar</option>"
-                          "<option value='BRL'>Brazilian Real</option>"
-                          "<option value='BTC'>Bitcoin</option>"
-                          "<option value='CAD'>Canadian Dollar</option>"
-                          "<option value='CNY'>Chinese Yuan</option>"
-                          "<option value='EUR'>Euro</option>"
-                          "<option value='GBP'>British Pound Sterling</option>"
-                          "<option value='XAU'>Gold (troy ounce)</option>";
-
 static const char WIDECLOCK_FORM[] PROGMEM = "<form class='w3-container' action='/savewideclock' method='get'><h2>Wide Clock Configuration:</h2>"
                           "<p>Wide Clock Display Format <select class='w3-option w3-padding' name='wideclockformat'>%WIDECLOCKOPTIONS%</select></p>"
                           "<button class='w3-button w3-block w3-grey w3-section w3-padding' type='submit'>Save</button></form>";
 
-static const char PIHOLE_FORM[] PROGMEM = "<form class='w3-container' action='/savepihole' method='get'><h2>Pi-hole Configuration:</h2>"
-                        "<p><input name='displaypihole' class='w3-check w3-margin-top' type='checkbox' %PIHOLECHECKED%> Show Pi-hole Statistics</p>"
-                        "<label>Pi-hole Address (do not include http://)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='piholeAddress' id='piholeAddress' value='%PIHOLEADDRESS%' maxlength='60'>"
-                        "<label>Pi-hole Port</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='piholePort' id= 'piholePort' value='%PIHOLEPORT%' maxlength='5'  onkeypress='return isNumberKey(event)'>"
-                        "<input type='button' value='Test Connection and JSON Response' onclick='testPiHole()'><p id='PiHoleTest'></p>"
-                        "<button class='w3-button w3-block w3-green w3-section w3-padding' type='submit'>Save</button></form>"
-                        "<script>function isNumberKey(e){var h=e.which?e.which:event.keyCode;return!(h>31&&(h<48||h>57))}</script>";
-
-static const char PIHOLE_TEST[] PROGMEM = "<script>function testPiHole(){var e=document.getElementById(\"PiHoleTest\"),t=document.getElementById(\"piholeAddress\").value,"
-                       "n=document.getElementById(\"piholePort\").value;"
-                       "if(e.innerHTML=\"\",\"\"==t||\"\"==n)return e.innerHTML=\"* Address and Port are required\","
-                       "void(e.style.background=\"\");var r=\"http://\"+t+\":\"+n;r+=\"/admin/api.php?summary\",window.open(r,\"_blank\").focus()}</script>";
-
-static const char NEWS_FORM1[] PROGMEM =   "<form class='w3-container' action='/savenews' method='get'><h2>News Configuration:</h2>"
-                        "<p><input name='displaynews' class='w3-check w3-margin-top' type='checkbox' %NEWSCHECKED%> Display News Headlines</p>"
-                        "<label>News API Key (get from <a href='https://newsapi.org/' target='_BLANK'>here</a>)</label>"
-                        "<input class='w3-input w3-border w3-margin-bottom' type='text' name='newsApiKey' value='%NEWSKEY%' maxlength='60'>"
-                        "<p>Select News Source <select class='w3-option w3-padding' name='newssource' id='newssource'></select></p>"
-                        "<script>var s='%NEWSSOURCE%';var tt;var xmlhttp=new XMLHttpRequest();xmlhttp.open('GET','https://raw.githubusercontent.com/Qrome/marquee-scroller/master/sources.json',!0);"
-                        "xmlhttp.onreadystatechange=function(){if(xmlhttp.readyState==4){if(xmlhttp.status==200){var obj=JSON.parse(xmlhttp.responseText);"
-                        "obj.sources.forEach(t)}}};xmlhttp.send();function t(it){if(it!=null){if(s==it.id){se=' selected'}else{se=''}tt+='<option'+se+'>'+it.id+'</option>';"
-                        "document.getElementById('newssource').innerHTML=tt}}</script>"
-                        "<button class='w3-button w3-block w3-grey w3-section w3-padding' type='submit'>Save</button></form>";
-
-static const char OCTO_FORM[] PROGMEM = "<form class='w3-container' action='/saveoctoprint' method='get'><h2>OctoPrint Configuration:</h2>"
-                        "<p><input name='displayoctoprint' class='w3-check w3-margin-top' type='checkbox' %OCTOCHECKED%> Show OctoPrint Status</p>"
-                        "<p><input name='octoprintprogress' class='w3-check w3-margin-top' type='checkbox' %OCTOPROGRESSCHECKED%> Show OctoPrint progress with clock</p>"
-                        "<label>OctoPrint API Key (get from your server)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='octoPrintApiKey' value='%OCTOKEY%' maxlength='60'>"
-                        "<label>OctoPrint Address (do not include http://)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='octoPrintAddress' value='%OCTOADDRESS%' maxlength='60'>"
-                        "<label>OctoPrint Port</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='octoPrintPort' value='%OCTOPORT%' maxlength='5'  onkeypress='return isNumberKey(event)'>"
-                        "<label>OctoPrint User (only needed if you have haproxy or basic auth turned on)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='octoUser' value='%OCTOUSER%' maxlength='30'>"
-                        "<label>OctoPrint Password </label><input class='w3-input w3-border w3-margin-bottom' type='password' name='octoPass' value='%OCTOPASS%'>"
+static const char MQTT_FORM[] PROGMEM = "<form class='w3-container' action='/savemqtt' method='get'><h2>MQTT Configuration:</h2>"
+                        "<p><input name='mqttenable' class='w3-check w3-margin-top' type='checkbox' %MQTTCHECKED%> Enable MQTT</p>"
+                        "<label>MQTT device name</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttDeviceName' value='%MQTTDEVICE%' maxlength='60'>"
+                        "<label>MQTT URL (do not include http://)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttUrl' value='%MQTTURL%' maxlength='60'>"
+                        "<label>MQTT Port</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttPort' value='%MQTTPORT%' maxlength='5'  onkeypress='return isNumberKey(event)'>"
+                        "<label>MQTT topic</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttTopic' value='%MQTTTOPIC%'>"
                         "<button class='w3-button w3-block w3-green w3-section w3-padding' type='submit'>Save</button></form>"
                         "<script>function isNumberKey(e){var h=e.which?e.which:event.keyCode;return!(h>31&&(h<48||h>57))}</script>";
 
@@ -300,6 +259,8 @@ void setup() {
     server.on("/configure", handleConfigure);
     server.on("/configurewideclock", handleWideClockConfigure);
     server.on("/display", handleDisplay);
+    server.on("/savemqtt", handleSaveMqtt);
+    server.on("/configuremqtt", handleConfigureMqtt);
     server.onNotFound(redirectHome);
     serverUpdater.setup(&server, "/update", www_username, www_password);
     // Start the server
@@ -312,6 +273,10 @@ void setup() {
   } else {
     Serial.println("Web Interface is Disabled");
     scrollMessage("Web Interface is Disabled");
+  }
+  if(ENABLE_MQTT){
+    Serial.println("MQTT connect");
+    mqttClient.connect(mqttUrl, mqttPort, mqttTopic, mqttDeviceId);
   }
 
   flashLED(1, 500);
@@ -378,6 +343,11 @@ void loop() {
       }
      
       msg += marqueeMessage + " ";
+
+      if (ENABLE_MQTT) {
+        msg += "    " + mqttClient.getMessage();
+      }
+
       scrollMessage(msg);
     }
   }
@@ -410,6 +380,9 @@ void loop() {
   }
   if (ENABLE_OTA) {
     ArduinoOTA.handle();
+  }
+  if (ENABLE_MQTT) {
+    mqttClient.loop();  //we need to loop as much as we can
   }
 }
 
@@ -743,6 +716,57 @@ void displayMessage(String message) {
   digitalWrite(externalLight, HIGH);
 }
 
+void handleSaveMqtt() {
+  if (!athentication()) {
+    return server.requestAuthentication();
+  }
+  boolean oldMqtt = ENABLE_MQTT;
+  ENABLE_MQTT = server.hasArg("mqttenable");
+  mqttDeviceId = server.arg("mqttDeviceName");
+  mqttUrl = server.arg("mqttUrl");
+  mqttPort = server.arg("mqttPort").toInt();
+  mqttTopic = server.arg("mqttTopic");
+  writeCityIds();
+  redirectHome();
+  if (oldMqtt != ENABLE_MQTT) {
+    ESP.restart();
+  }
+}
+
+
+void handleConfigureMqtt() {
+  if (!athentication()) {
+    return server.requestAuthentication();
+  }
+  digitalWrite(externalLight, LOW);
+
+  server.sendHeader("Cache-Control", "no-cache, no-store");
+  server.sendHeader("Pragma", "no-cache");
+  server.sendHeader("Expires", "-1");
+  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
+  server.send(200, "text/html", "");
+
+  sendHeader();
+
+  String form = FPSTR(MQTT_FORM);
+  String isMqttChecked = "";
+  if (ENABLE_MQTT) {
+    isMqttChecked = "checked='checked'";
+  }
+  form.replace("%MQTTCHECKED%", isMqttChecked);
+  form.replace("%MQTTDEVICE%", mqttDeviceId);
+  form.replace("%MQTTURL%", mqttUrl);
+  form.replace("%MQTTPORT%", String(mqttPort));
+  form.replace("%MQTTTOPIC%", mqttTopic);
+  server.sendContent(form);
+
+  sendFooter();
+
+  server.sendContent("");
+  server.client().stop();
+  digitalWrite(externalLight, HIGH);
+}
+
 void redirectHome() {
   // Send them back to the Root Directory
   server.sendHeader("Location", String("/"), true);
@@ -1034,6 +1058,11 @@ String writeCityIds() {
     f.println("SHOW_PRESSURE=" + String(SHOW_PRESSURE));
     f.println("SHOW_HIGHLOW=" + String(SHOW_HIGHLOW));
     f.println("SHOW_DATE=" + String(SHOW_DATE));
+    f.println("ENABLE_MQTT=" + String(ENABLE_MQTT));
+    f.println("mqttDeviceId=" + mqttDeviceId);
+    f.println("mqttUrl=" + mqttUrl);
+    f.println("mqttPort=" + String(mqttPort));
+    f.println("mqttTopic=" + mqttTopic);
   }
   f.close();
   readCityIds();
@@ -1167,6 +1196,27 @@ void readCityIds() {
     if (line.indexOf("SHOW_DATE=") >= 0) {
       SHOW_DATE = line.substring(line.lastIndexOf("SHOW_DATE=") + 10).toInt();
       Serial.println("SHOW_DATE=" + String(SHOW_DATE));
+    }
+
+    if (line.indexOf("ENABLE_MQTT=") >= 0) {
+      ENABLE_MQTT = line.substring(line.lastIndexOf("ENABLE_MQTT=") + 12).toInt();
+      Serial.println("ENABLE_MQTT=" + String(ENABLE_MQTT));
+    }
+    if (line.indexOf("mqttUrl=") >= 0) {
+      mqttUrl = line.substring(line.lastIndexOf("mqttUrl=") + 8);
+      Serial.println("mqttUrl=" + String(mqttUrl));
+    }
+    if (line.indexOf("mqttPort=") >= 0) {
+      mqttPort = line.substring(line.lastIndexOf("mqttPort=") + 9).toInt();
+      Serial.println("mqttPort=" + String(mqttPort));
+    }
+    if (line.indexOf("mqttTopic=") >= 0) {
+      mqttTopic = line.substring(line.lastIndexOf("mqttTopic=") + 10);
+      Serial.println("mqttTopic=" + String(mqttTopic));
+    }
+    if (line.indexOf("mqttDeviceId=") >= 0) {
+      mqttDeviceId = line.substring(line.lastIndexOf("mqttDeviceId=") + 13);
+      Serial.println("mqttDeviceId=" + String(mqttDeviceId));
     }
   }
   fr.close();
