@@ -59,91 +59,17 @@ String Wide_Clock_Style = "1";  //1="hh:mm Temp", 2="hh:mm:ss", 3="hh:mm"
 float UtcOffset;  //time zone offsets that correspond with the CityID above (offset from GMT)
 
 // Time
-TimeDB TimeDB("");
+TimeService timeClient = TimeService();
 String lastMinute = "xx";
 int displayRefreshCount = 1;
-long lastEpoch = 0;
-long firstEpoch = 0;
 long displayOffEpoch = 0;
 boolean displayOn = true;
 
 //MQTT client
 MqttClient mqttClient = MqttClient();
 
-// Weather Client
-OpenWeatherMapClient weatherClient(APIKEY, CityIDs, 1, IS_METRIC);
-// (some) Default Weather Settings
-boolean SHOW_DATE = false;
-boolean SHOW_CITY = true;
-boolean SHOW_CONDITION = true;
-boolean SHOW_HUMIDITY = true;
-boolean SHOW_WIND = true;
-boolean SHOW_WINDDIR = true;
-boolean SHOW_PRESSURE = false;
-boolean SHOW_HIGHLOW = true;
-
 ESP8266WebServer server(WEBSERVER_PORT);
 ESP8266HTTPUpdateServer serverUpdater;
-
-static const char WEB_ACTIONS1[] PROGMEM = "<a class='w3-bar-item w3-button' href='/'><i class='fas fa-home'></i> Home</a>"
-                        "<a class='w3-bar-item w3-button' href='/configure'><i class='fas fa-cog'></i> Configure</a>";
-
-static const char WEB_ACTIONS2[] PROGMEM = "<a class='w3-bar-item w3-button' href='/configuremqtt'><i class='fab fa-stream'></i> MQTT</a>"
-                        "<a class='w3-bar-item w3-button' href='/pull'><i class='fas fa-cloud-download-alt'></i> Refresh Data</a>"
-                        "<a class='w3-bar-item w3-button' href='/display'>";
-
-static const char WEB_ACTION3[] PROGMEM = "</a><a class='w3-bar-item w3-button' href='/systemreset' onclick='return confirm(\"Do you want to reset to default weather settings?\")'><i class='fas fa-undo'></i> Reset Settings</a>"
-                       "<a class='w3-bar-item w3-button' href='/forgetwifi' onclick='return confirm(\"Do you want to forget to WiFi connection?\")'><i class='fas fa-wifi'></i> Forget WiFi</a>"
-                       "<a class='w3-bar-item w3-button' href='/update'><i class='fas fa-wrench'></i> Firmware Update</a>"
-                       "<a class='w3-bar-item w3-button' href='https://github.com/Qrome/marquee-scroller' target='_blank'><i class='fas fa-question-circle'></i> About</a>";
-
-static const char CHANGE_FORM1[] PROGMEM = "<form class='w3-container' action='/locations' method='get'><h2>Configure:</h2>"
-                      "<label>TimeZone DB API Key (get from <a href='https://timezonedb.com/register' target='_BLANK'>here</a>)</label>"
-                      "<input class='w3-input w3-border w3-margin-bottom' type='text' name='TimeZoneDB' value='%TIMEDBKEY%' maxlength='60'>"
-                      "<label>OpenWeatherMap API Key (get from <a href='https://openweathermap.org/' target='_BLANK'>here</a>)</label>"
-                      "<input class='w3-input w3-border w3-margin-bottom' type='text' name='openWeatherMapApiKey' value='%WEATHERKEY%' maxlength='70'>"
-                      "<p><label>%CITYNAME1% (<a href='http://openweathermap.org/find' target='_BLANK'><i class='fas fa-search'></i> Search for City ID</a>)</label>"
-                      "<input class='w3-input w3-border w3-margin-bottom' type='text' name='city1' value='%CITY1%' onkeypress='return isNumberKey(event)'></p>"
-                      "<p><input name='metric' class='w3-check w3-margin-top' type='checkbox' %CHECKED%> Use Metric (Celsius)</p>"
-                      "<p><input name='showdate' class='w3-check w3-margin-top' type='checkbox' %DATE_CHECKED%> Display Date</p>"
-                      "<p><input name='showcity' class='w3-check w3-margin-top' type='checkbox' %CITY_CHECKED%> Display City Name</p>"
-                      "<p><input name='showhighlow' class='w3-check w3-margin-top' type='checkbox' %HIGHLOW_CHECKED%> Display Daily High/Low Temperatures</p>"
-                      "<p><input name='showcondition' class='w3-check w3-margin-top' type='checkbox' %CONDITION_CHECKED%> Display Weather Condition</p>"
-                      "<p><input name='showhumidity' class='w3-check w3-margin-top' type='checkbox' %HUMIDITY_CHECKED%> Display Humidity</p>"
-                      "<p><input name='showwind' class='w3-check w3-margin-top' type='checkbox' %WIND_CHECKED%> Display Wind</p>"
-                      "<p><input name='showpressure' class='w3-check w3-margin-top' type='checkbox' %PRESSURE_CHECKED%> Display Barometric Pressure</p>"
-                      "<p><input name='is24hour' class='w3-check w3-margin-top' type='checkbox' %IS_24HOUR_CHECKED%> Use 24 Hour Clock (military time)</p>";
-
-static const char CHANGE_FORM2[] PROGMEM = "<p><input name='isPM' class='w3-check w3-margin-top' type='checkbox' %IS_PM_CHECKED%> Show PM indicator (only 12h format)</p>"
-                      "<p><input name='flashseconds' class='w3-check w3-margin-top' type='checkbox' %FLASHSECONDS%> Flash : in the time</p>"
-                      "<p><label>Marquee Message (up to 60 chars)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='marqueeMsg' value='%MSG%' maxlength='60'></p>"
-                      "<p><label>Start Time </label><input name='startTime' type='time' value='%STARTTIME%'></p>"
-                      "<p><label>End Time </label><input name='endTime' type='time' value='%ENDTIME%'></p>"
-                      "<p>Display Brightness <input class='w3-border w3-margin-bottom' name='ledintensity' type='number' min='0' max='15' value='%INTENSITYOPTIONS%'></p>"
-                      "<p>Display Scroll Speed <select class='w3-option w3-padding' name='scrollspeed'>%SCROLLOPTIONS%</select></p>"
-                      "<p>Minutes Between Refresh Data <select class='w3-option w3-padding' name='refresh'>%OPTIONS%</select></p>"
-                      "<p>Minutes Between Scrolling Data <input class='w3-border w3-margin-bottom' name='refreshDisplay' type='number' min='1' max='10' value='%REFRESH_DISPLAY%'></p>";
-
-static const char CHANGE_FORM3[] PROGMEM = "<hr><p><input name='isBasicAuth' class='w3-check w3-margin-top' type='checkbox' %IS_BASICAUTH_CHECKED%> Use Security Credentials for Configuration Changes</p>"
-                      "<p><label>Marquee User ID (for this web interface)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='userid' value='%USERID%' maxlength='20'></p>"
-                      "<p><label>Marquee Password </label><input class='w3-input w3-border w3-margin-bottom' type='password' name='stationpassword' value='%STATIONPASSWORD%'></p>"
-                      "<p><button class='w3-button w3-block w3-green w3-section w3-padding' type='submit'>Save</button></p></form>"
-                      "<script>function isNumberKey(e){var h=e.which?e.which:event.keyCode;return!(h>31&&(h<48||h>57))}</script>";
-
-static const char WIDECLOCK_FORM[] PROGMEM = "<form class='w3-container' action='/savewideclock' method='get'><h2>Wide Clock Configuration:</h2>"
-                          "<p>Wide Clock Display Format <select class='w3-option w3-padding' name='wideclockformat'>%WIDECLOCKOPTIONS%</select></p>"
-                          "<button class='w3-button w3-block w3-grey w3-section w3-padding' type='submit'>Save</button></form>";
-
-static const char MQTT_FORM[] PROGMEM = "<form class='w3-container' action='/savemqtt' method='get'><h2>MQTT Configuration:</h2>"
-                        "<p><input name='mqttenable' class='w3-check w3-margin-top' type='checkbox' %MQTTCHECKED%> Enable MQTT</p>"
-                        "<label>MQTT device name</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttDeviceName' value='%MQTTDEVICE%' maxlength='60'>"
-                        "<label>MQTT URL (do not include http://)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttUrl' value='%MQTTURL%' maxlength='60'>"
-                        "<label>MQTT Port</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttPort' value='%MQTTPORT%' maxlength='5'  onkeypress='return isNumberKey(event)'>"
-                        "<label>MQTT topic</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttTopic' value='%MQTTTOPIC%'>"
-                        "<button class='w3-button w3-block w3-green w3-section w3-padding' type='submit'>Save</button></form>"
-                        "<script>function isNumberKey(e){var h=e.which?e.which:event.keyCode;return!(h>31&&(h<48||h>57))}</script>";
-
-
 
 const int TIMEOUT = 500; // 500 = 1/2 second
 int timeoutCount = 0;
@@ -197,18 +123,12 @@ void setup() {
   }
   delay(1000);
   matrix.setIntensity(displayIntensity);
-  //noTone(BUZZER_PIN);
 
   //WiFiManager
   //Local intialization. Once its business is done, there is no need to keep it around
   WiFiManager wifiManager;
 
-  // Uncomment for testing wifi manager
-  //wifiManager.resetSettings();
   wifiManager.setAPCallback(configModeCallback);
-
-  //Custom Station (client) Static IP Configuration - Set custom IP for your Network (IP, Gateway, Subnet mask)
-  //wifiManager.setSTAStaticIPConfig(IPAddress(192,168,0,99), IPAddress(192,168,0,1), IPAddress(255,255,255,0));
 
   String hostname(HOSTNAME);
   hostname += String(ESP.getChipId(), HEX);
@@ -250,7 +170,7 @@ void setup() {
   }
 
   if (WEBSERVER_ENABLED) {
-    server.on("/", displayWeatherData);
+    server.on("/", handleConfigure);
     server.on("/pull", handlePull);
     server.on("/locations", handleLocations);
     server.on("/savewideclock", handleSaveWideClock);
@@ -274,9 +194,12 @@ void setup() {
     Serial.println("Web Interface is Disabled");
     scrollMessage("Web Interface is Disabled");
   }
+  timeClient.updateTime();
   if(ENABLE_MQTT){
     Serial.println("MQTT connect");
+    scrollMessage("MQTT...");
     mqttClient.connect(mqttUrl, mqttPort, mqttTopic, mqttDeviceId);
+    scrollMessage("...connected");
   }
 
   flashLED(1, 500);
@@ -286,20 +209,13 @@ void setup() {
 // Main Looop
 //************************************************************
 void loop() {
-  //Get some Weather Data to serve
-  if ((getMinutesFromLastRefresh() >= minutesBetweenDataRefresh) || lastEpoch == 0) {
-    getWeatherData();
-  }
   checkDisplay(); // this will see if we need to turn it on or off for night mode.
 
-  if (lastMinute != TimeDB.zeroPad(minute())) {
-    lastMinute = TimeDB.zeroPad(minute());
-
-    if (weatherClient.getError() != "") {
-      scrollMessage(weatherClient.getError());
-      return;
+  if (lastMinute != timeClient.zeroPad(timeClient.minute())) {
+    lastMinute = timeClient.zeroPad(timeClient.minute());
+    if(timeClient.minute() % 15 == 0){
+      timeClient.updateTime();
     }
-
     if (displayOn) {
       matrix.shutdown(false);
     }
@@ -308,64 +224,22 @@ void loop() {
     // Check to see if we need to Scroll some Data
     if (displayRefreshCount <= 0) {
       displayRefreshCount = minutesBetweenScrolling;
-      String temperature = weatherClient.getTempRounded(0);
-      String description = weatherClient.getDescription(0);
-      description.toUpperCase();
       String msg;
       msg += " ";
-
-      if (SHOW_DATE) {
-        msg += TimeDB.getDayName() + ", ";
-        msg += TimeDB.getMonthName() + " " + day() + "  ";
-      }
-      if (SHOW_CITY) {
-        msg += weatherClient.getCity(0) + "  ";
-      }
-      msg += temperature + getTempSymbol() + "  ";
-
-      //show high/low temperature
-      if (SHOW_HIGHLOW) {
-        msg += "High/Low:" + weatherClient.getHigh(0) + "/" + weatherClient.getLow(0) + " " + getTempSymbol() + "  ";
-      }
-      
-      if (SHOW_CONDITION) {
-        msg += description + "  ";
-      }
-      if (SHOW_HUMIDITY) {
-        msg += "Humidity:" + weatherClient.getHumidityRounded(0) + "%  ";
-      }
-      if (SHOW_WIND) {
-        msg += "Wind: " + weatherClient.getDirectionText(0) + " @ " + weatherClient.getWindRounded(0) + " " + getSpeedSymbol() + "  ";
-      }
-      //line to show barometric pressure
-      if (SHOW_PRESSURE) {
-        msg += "Pressure:" + weatherClient.getPressure(0) + getPressureSymbol() + "  ";
-      }
-     
-      msg += marqueeMessage + " ";
-
       if (ENABLE_MQTT) {
-        msg += "    " + mqttClient.getMessage();
+        msg += mqttClient.getMessage();
       }
-
-      scrollMessage(msg);
+      if(msg.length() > 1) {
+        scrollMessage(msg);
+      }
     }
   }
 
   String currentTime = hourMinutes(false);
 
   if (numberOfHorizontalDisplays >= 8) {
-    if (Wide_Clock_Style == "1") {
-      // On Wide Display -- show the current temperature as well
-      String currentTemp = weatherClient.getTempRounded(0);
-      String timeSpacer = "  ";
-      if (currentTemp.length() >= 3) {
-        timeSpacer = " ";
-      }
-      currentTime += timeSpacer + currentTemp + getTempSymbol();
-    }
     if (Wide_Clock_Style == "2") {
-      currentTime += secondsIndicator(false) + TimeDB.zeroPad(second());
+      currentTime += secondsIndicator(false) + timeClient.zeroPad(timeClient.second());
       matrix.fillScreen(LOW); // show black
     }
     if (Wide_Clock_Style == "3") {
@@ -388,15 +262,15 @@ void loop() {
 
 String hourMinutes(boolean isRefresh) {
   if (IS_24HOUR) {
-    return hour() + secondsIndicator(isRefresh) + TimeDB.zeroPad(minute());
+    return timeClient.hour() + secondsIndicator(isRefresh) + timeClient.zeroPad(timeClient.minute());
   } else {
-    return hourFormat12() + secondsIndicator(isRefresh) + TimeDB.zeroPad(minute());
+    return timeClient.get12hHourFormat() + secondsIndicator(isRefresh) + timeClient.zeroPad(timeClient.minute());
   }
 }
 
 String secondsIndicator(boolean isRefresh) {
   String rtnValue = ":";
-  if (isRefresh == false && (flashOnSeconds && (second() % 2) == 0)) {
+  if (isRefresh == false && (flashOnSeconds && (timeClient.second() % 2) == 0)) {
     rtnValue = " ";
   }
   return rtnValue;
@@ -404,14 +278,13 @@ String secondsIndicator(boolean isRefresh) {
 
 boolean athentication() {
   if (IS_BASIC_AUTH) {
-    return server.authenticate(www_username, www_password);
+    return server.authenticate(www_username.c_str(), www_password.c_str());
   }
   return true; // Authentication not required
 }
 
 void handlePull() {
-  getWeatherData(); // this will force a data pull for new weather
-  displayWeatherData();
+  timeClient.updateTime();
 }
 
 void handleSaveWideClock() {
@@ -430,36 +303,20 @@ void handleLocations() {
   if (!athentication()) {
     return server.requestAuthentication();
   }
-  TIMEDBKEY = server.arg("TimeZoneDB");
-  APIKEY = server.arg("openWeatherMapApiKey");
-  CityIDs[0] = server.arg("city1").toInt();
   flashOnSeconds = server.hasArg("flashseconds");
   IS_24HOUR = server.hasArg("is24hour");
   IS_PM = server.hasArg("isPM");
-  SHOW_DATE = server.hasArg("showdate");
-  SHOW_CITY = server.hasArg("showcity");
-  SHOW_CONDITION = server.hasArg("showcondition");
-  SHOW_HUMIDITY = server.hasArg("showhumidity");
-  SHOW_WIND = server.hasArg("showwind");
-  SHOW_PRESSURE = server.hasArg("showpressure");
-  SHOW_HIGHLOW = server.hasArg("showhighlow");
-  IS_METRIC = server.hasArg("metric");
-  marqueeMessage = decodeHtmlString(server.arg("marqueeMsg"));
   timeDisplayTurnsOn = decodeHtmlString(server.arg("startTime"));
   timeDisplayTurnsOff = decodeHtmlString(server.arg("endTime"));
   displayIntensity = server.arg("ledintensity").toInt();
-  minutesBetweenDataRefresh = server.arg("refresh").toInt();
   minutesBetweenScrolling = server.arg("refreshDisplay").toInt();
   displayScrollSpeed = server.arg("scrollspeed").toInt();
   IS_BASIC_AUTH = server.hasArg("isBasicAuth");
-  String temp = server.arg("userid");
-  temp.toCharArray(www_username, sizeof(temp));
-  temp = server.arg("stationpassword");
-  temp.toCharArray(www_password, sizeof(temp));
-  weatherClient.setMetric(IS_METRIC);
+  www_username = server.arg("userid");
+  www_password = server.arg("stationpassword");
   matrix.fillScreen(LOW); // show black
   writeCityIds();
-  getWeatherData(); // this will force a data pull for new weather
+  timeClient.updateTime(); // this will force a data pull for new weather
   redirectHome();
 }
 
@@ -503,13 +360,13 @@ void handleWideClockConfigure() {
   if (numberOfHorizontalDisplays >= 8) {
     // Wide display options
     String form = FPSTR(WIDECLOCK_FORM);
-    String clockOptions = "<option value='1'>HH:MM Temperature</option><option value='2'>HH:MM:SS</option><option value='3'>HH:MM</option>";
+    String clockOptions = "<option value='2'>HH:MM:SS</option><option value='3'>HH:MM</option>";
     clockOptions.replace(Wide_Clock_Style + "'", Wide_Clock_Style + "' selected");
     form.replace("%WIDECLOCKOPTIONS%", clockOptions);
     server.sendContent(form);
   }
 
-  sendFooter();
+  server.sendContent(createFooter(getWifiQuality(), VERSION));
 
   server.sendContent("");
   server.client().stop();
@@ -532,64 +389,13 @@ void handleConfigure() {
   sendHeader();
 
   String form = FPSTR(CHANGE_FORM1);
-  form.replace("%TIMEDBKEY%", TIMEDBKEY);
-  form.replace("%WEATHERKEY%", APIKEY);
-
-
-  String cityName = "";
-  if (weatherClient.getCity(0) != "") {
-    cityName = weatherClient.getCity(0) + ", " + weatherClient.getCountry(0);
-  }
-  form.replace("%CITYNAME1%", cityName);
-  form.replace("%CITY1%", String(CityIDs[0]));
-  String isDateChecked = "";
-  if (SHOW_DATE) {
-    isDateChecked = "checked='checked'";
-  }
-  form.replace("%DATE_CHECKED%", isDateChecked);
-  String isCityChecked = "";
-  if (SHOW_CITY) {
-    isCityChecked = "checked='checked'";
-  }
-  form.replace("%CITY_CHECKED%", isCityChecked);
-  String isConditionChecked = "";
-  if (SHOW_CONDITION) {
-    isConditionChecked = "checked='checked'";
-  }
-  form.replace("%CONDITION_CHECKED%", isConditionChecked);
-  String isHumidityChecked = "";
-  if (SHOW_HUMIDITY) {
-    isHumidityChecked = "checked='checked'";
-  }
-  form.replace("%HUMIDITY_CHECKED%", isHumidityChecked);
-  String isWindChecked = "";
-  if (SHOW_WIND) {
-    isWindChecked = "checked='checked'";
-  }
-  form.replace("%WIND_CHECKED%", isWindChecked);
-  String isPressureChecked = "";
-  if (SHOW_PRESSURE) {
-    isPressureChecked = "checked='checked'";
-  }
-  form.replace("%PRESSURE_CHECKED%", isPressureChecked);
-
-  String isHighlowChecked = "";
-  if (SHOW_HIGHLOW) {
-    isHighlowChecked = "checked='checked'";
-  }
-  form.replace("%HIGHLOW_CHECKED%", isHighlowChecked);
-
   
   String is24hourChecked = "";
   if (IS_24HOUR) {
     is24hourChecked = "checked='checked'";
   }
   form.replace("%IS_24HOUR_CHECKED%", is24hourChecked);
-  String checked = "";
-  if (IS_METRIC) {
-    checked = "checked='checked'";
-  }
-  form.replace("%CHECKED%", checked);
+  
   server.sendContent(form);
 
   form = FPSTR(CHANGE_FORM2);
@@ -603,7 +409,6 @@ void handleConfigure() {
     isFlashSecondsChecked = "checked='checked'";
   }
   form.replace("%FLASHSECONDS%", isFlashSecondsChecked);
-  form.replace("%MSG%", marqueeMessage);
   form.replace("%STARTTIME%", timeDisplayTurnsOn);
   form.replace("%ENDTIME%", timeDisplayTurnsOff);
   form.replace("%INTENSITYOPTIONS%", String(displayIntensity));
@@ -611,10 +416,6 @@ void handleConfigure() {
   String scrollOptions = "<option value='35'>Slow</option><option value='25'>Normal</option><option value='15'>Fast</option><option value='10'>Very Fast</option>";
   scrollOptions.replace(dSpeed + "'", dSpeed + "' selected" );
   form.replace("%SCROLLOPTIONS%", scrollOptions);
-  String minutes = String(minutesBetweenDataRefresh);
-  String options = "<option>5</option><option>10</option><option>15</option><option>20</option><option>30</option><option>60</option>";
-  options.replace(">" + minutes + "<", " selected>" + minutes + "<");
-  form.replace("%OPTIONS%", options);
   form.replace("%REFRESH_DISPLAY%", String(minutesBetweenScrolling));
 
   server.sendContent(form); //Send another chunk of the form
@@ -630,7 +431,7 @@ void handleConfigure() {
 
   server.sendContent(form); // Send the second chunk of Data
 
-  sendFooter();
+  server.sendContent(createFooter(getWifiQuality(), VERSION));
 
   server.sendContent("");
   server.client().stop();
@@ -650,55 +451,6 @@ void handleDisplay() {
 }
 
 //***********************************************************************
-void getWeatherData() //client function to send/receive GET request data.
-{
-  digitalWrite(externalLight, LOW);
-  matrix.fillScreen(LOW); // show black
-  Serial.println();
-
-  if (displayOn) {
-    // only pull the weather data if display is on
-    if (firstEpoch != 0) {
-      centerPrint(hourMinutes(true), true);
-    } else {
-      centerPrint("...");
-    }
-    matrix.drawPixel(0, 7, HIGH);
-    matrix.drawPixel(0, 6, HIGH);
-    matrix.drawPixel(0, 5, HIGH);
-    matrix.write();
-
-    weatherClient.updateWeather();
-    if (weatherClient.getError() != "") {
-      scrollMessage(weatherClient.getError());
-    }
-  }
-
-  Serial.println("Updating Time...");
-  //Update the Time
-  matrix.drawPixel(0, 4, HIGH);
-  matrix.drawPixel(0, 3, HIGH);
-  matrix.drawPixel(0, 2, HIGH);
-  Serial.println("matrix Width:" + matrix.width());
-  matrix.write();
-  TimeDB.updateConfig(TIMEDBKEY, weatherClient.getLat(0), weatherClient.getLon(0));
-  time_t currentTime = TimeDB.getTime();
-  if(currentTime > 5000 || firstEpoch == 0) {
-    setTime(currentTime);
-  } else {
-    Serial.println("Time update unsuccessful!");
-  }
-  lastEpoch = now();
-  if (firstEpoch == 0) {
-    firstEpoch = now();
-    Serial.println("firstEpoch is: " + String(firstEpoch));
-  }
-
-  Serial.println("Version: " + String(VERSION));
-  Serial.println();
-  digitalWrite(externalLight, HIGH);
-}
-
 void displayMessage(String message) {
   digitalWrite(externalLight, LOW);
 
@@ -709,7 +461,7 @@ void displayMessage(String message) {
   server.send(200, "text/html", "");
   sendHeader();
   server.sendContent(message);
-  sendFooter();
+  server.sendContent(createFooter(getWifiQuality(), VERSION));
   server.sendContent("");
   server.client().stop();
 
@@ -720,7 +472,6 @@ void handleSaveMqtt() {
   if (!athentication()) {
     return server.requestAuthentication();
   }
-  boolean oldMqtt = ENABLE_MQTT;
   ENABLE_MQTT = server.hasArg("mqttenable");
   mqttDeviceId = server.arg("mqttDeviceName");
   mqttUrl = server.arg("mqttUrl");
@@ -728,9 +479,7 @@ void handleSaveMqtt() {
   mqttTopic = server.arg("mqttTopic");
   writeCityIds();
   redirectHome();
-  if (oldMqtt != ENABLE_MQTT) {
-    ESP.restart();
-  }
+  ESP.restart();
 }
 
 
@@ -760,7 +509,7 @@ void handleConfigureMqtt() {
   form.replace("%MQTTTOPIC%", mqttTopic);
   server.sendContent(form);
 
-  sendFooter();
+  server.sendContent(createFooter(getWifiQuality(), VERSION));
 
   server.sendContent("");
   server.client().stop();
@@ -791,7 +540,6 @@ void sendHeader() {
   html = "<nav class='w3-sidebar w3-bar-block w3-card' style='margin-top:88px' id='mySidebar'>";
   html += "<div class='w3-container w3-theme-d2'>";
   html += "<span onclick='closeSidebar()' class='w3-button w3-display-topright w3-large'><i class='fas fa-times'></i></span>";
-  html += "<div class='w3-left'><img src='http://openweathermap.org/img/w/" + weatherClient.getIcon(0) + ".png' alt='" + weatherClient.getDescription(0) + "'></div>";
   html += "<div class='w3-padding'>Menu</div></div>";
   server.sendContent(html);
 
@@ -817,84 +565,6 @@ void sendHeader() {
   server.sendContent(html);
 }
 
-void sendFooter() {
-  int8_t rssi = getWifiQuality();
-  Serial.print("Signal Strength (RSSI): ");
-  Serial.print(rssi);
-  Serial.println("%");
-  String html = "<br><br><br>";
-  html += "</div>";
-  html += "<footer class='w3-container w3-bottom w3-theme w3-margin-top'>";
-  html += "<i class='far fa-paper-plane'></i> Version: " + String(VERSION) + "<br>";
-  html += "<i class='far fa-clock'></i> Next Update: " + getTimeTillUpdate() + "<br>";
-  html += "<i class='fas fa-rss'></i> Signal Strength: ";
-  html += String(rssi) + "%";
-  html += "</footer>";
-  html += "</body></html>";
-  server.sendContent(html);
-}
-
-void displayWeatherData() {
-  digitalWrite(externalLight, LOW);
-  String html = "";
-
-  server.sendHeader("Cache-Control", "no-cache, no-store");
-  server.sendHeader("Pragma", "no-cache");
-  server.sendHeader("Expires", "-1");
-  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  server.send(200, "text/html", "");
-  sendHeader();
-
-  String temperature = weatherClient.getTemp(0);
-
-  if ((temperature.indexOf(".") != -1) && (temperature.length() >= (temperature.indexOf(".") + 2))) {
-    temperature.remove(temperature.indexOf(".") + 2);
-  }
-
-  String time = TimeDB.getDayName() + ", " + TimeDB.getMonthName() + " " + day() + ", " + hourFormat12() + ":" + TimeDB.zeroPad(minute()) + " " + TimeDB.getAmPm();
-
-  Serial.println(weatherClient.getCity(0));
-  Serial.println(weatherClient.getCondition(0));
-  Serial.println(weatherClient.getDescription(0));
-  Serial.println(temperature);
-  Serial.println(time);
-
-  if (TIMEDBKEY == "") {
-    html += "<p>Please <a href='/configure'>Configure TimeZoneDB</a> with API key.</p>";
-  }
-
-  if (weatherClient.getCity(0) == "") {
-    html += "<p>Please <a href='/configure'>Configure Weather</a> API</p>";
-    if (weatherClient.getError() != "") {
-      html += "<p>Weather Error: <strong>" + weatherClient.getError() + "</strong></p>";
-    }
-  } else {
-    html += "<div class='w3-cell-row' style='width:100%'><h2>" + weatherClient.getCity(0) + ", " + weatherClient.getCountry(0) + "</h2></div><div class='w3-cell-row'>";
-    html += "<div class='w3-cell w3-left w3-medium' style='width:120px'>";
-    html += "<img src='http://openweathermap.org/img/w/" + weatherClient.getIcon(0) + ".png' alt='" + weatherClient.getDescription(0) + "'><br>";
-    html += weatherClient.getHumidity(0) + "% Humidity<br>";
-    html += weatherClient.getDirectionText(0) + " / " + weatherClient.getWind(0) + " <span class='w3-tiny'>" + getSpeedSymbol() + "</span> Wind<br>";
-    html += weatherClient.getPressure(0) + " Pressure<br>";
-    html += "</div>";
-    html += "<div class='w3-cell w3-container' style='width:100%'><p>";
-    html += weatherClient.getCondition(0) + " (" + weatherClient.getDescription(0) + ")<br>";
-    html += temperature + " " + getTempSymbol() + "<br>";
-    html += weatherClient.getHigh(0) + "/" + weatherClient.getLow(0) + " " + getTempSymbol() + "<br>";
-    html += time + "<br>";
-    html += "<a href='https://www.google.com/maps/@" + weatherClient.getLat(0) + "," + weatherClient.getLon(0) + ",10000m/data=!3m1!1e3' target='_BLANK'><i class='fas fa-map-marker' style='color:red'></i> Map It!</a><br>";
-    html += "</p></div></div><hr>";
-  }
-
-
-  server.sendContent(String(html)); // spit out what we got
-  html = ""; // fresh start
-
-  sendFooter();
-  server.sendContent("");
-  server.client().stop();
-  digitalWrite(externalLight, HIGH);
-}
-
 void configModeCallback (WiFiManager *myWiFiManager) {
   Serial.println("Entered config mode");
   Serial.println(WiFi.softAPIP());
@@ -918,32 +588,6 @@ void flashLED(int number, int delayTime) {
   noTone(BUZZER_PIN);
 }
 
-String getTempSymbol() {
-  String rtnValue = "F";
-  if (IS_METRIC) {
-    rtnValue = "C";
-  }
-  return rtnValue;
-}
-
-String getSpeedSymbol() {
-  String rtnValue = "mph";
-  if (IS_METRIC) {
-    rtnValue = "kph";
-  }
-  return rtnValue;
-}
-
-String getPressureSymbol()
-{
-  String rtnValue = "";
-  if (IS_METRIC)
-  {
-    rtnValue = "mb";
-  }
-  return rtnValue;
-}
-
 // converts the dBm to a range between 0 and 100%
 int8_t getWifiQuality() {
   int32_t dbm = WiFi.RSSI();
@@ -956,53 +600,15 @@ int8_t getWifiQuality() {
   }
 }
 
-String getTimeTillUpdate() {
-  String rtnValue = "";
-
-  long timeToUpdate = (((minutesBetweenDataRefresh * 60) + lastEpoch) - now());
-
-  int hours = numberOfHours(timeToUpdate);
-  int minutes = numberOfMinutes(timeToUpdate);
-  int seconds = numberOfSeconds(timeToUpdate);
-
-  rtnValue += String(hours) + ":";
-  if (minutes < 10) {
-    rtnValue += "0";
-  }
-  rtnValue += String(minutes) + ":";
-  if (seconds < 10) {
-    rtnValue += "0";
-  }
-  rtnValue += String(seconds);
-
-  return rtnValue;
-}
-
-int getMinutesFromLastRefresh() {
-  int minutes = (now() - lastEpoch) / 60;
-  return minutes;
-}
-
-int getMinutesFromLastDisplay() {
-  int minutes = (now() - displayOffEpoch) / 60;
-  return minutes;
-}
-
 void enableDisplay(boolean enable) {
   displayOn = enable;
   if (enable) {
-    if (getMinutesFromLastDisplay() >= minutesBetweenDataRefresh) {
-      // The display has been off longer than the minutes between refresh -- need to get fresh data
-      lastEpoch = 0; // this should force a data pull of the weather
-      displayOffEpoch = 0;  // reset
-    }
     matrix.shutdown(false);
     matrix.fillScreen(LOW); // show black
-    Serial.println("Display was turned ON: " + now());
+    Serial.println("Display was turned ON: " + timeClient.timeToConsole());
   } else {
     matrix.shutdown(true);
-    Serial.println("Display was turned OFF: " + now());
-    displayOffEpoch = lastEpoch;
+    Serial.println("Display was turned OFF: " + timeClient.timeToConsole());
   }
 }
 
@@ -1011,7 +617,7 @@ void checkDisplay() {
   if (timeDisplayTurnsOn == "" || timeDisplayTurnsOff == "") {
     return; // nothing to do
   }
-  String currentTime = TimeDB.zeroPad(hour()) + ":" + TimeDB.zeroPad(minute());
+  String currentTime = timeClient.zeroPad(timeClient.hour()) + ":" + timeClient.zeroPad(timeClient.minute());
 
   if (currentTime == timeDisplayTurnsOn && !displayOn) {
     Serial.println("Time to turn display on: " + currentTime);
@@ -1026,17 +632,13 @@ void checkDisplay() {
   }
 }
 
-String writeCityIds() {
+void writeCityIds() {
   // Save decoded message to SPIFFS file for playback on power up.
   File f = SPIFFS.open(CONFIG, "w");
   if (!f) {
     Serial.println("File open failed!");
   } else {
     Serial.println("Saving settings now...");
-    f.println("TIMEDBKEY=" + TIMEDBKEY);
-    f.println("APIKEY=" + APIKEY);
-    f.println("CityID=" + String(CityIDs[0]));
-    f.println("marqueeMessage=" + marqueeMessage);
     f.println("timeDisplayTurnsOn=" + timeDisplayTurnsOn);
     f.println("timeDisplayTurnsOff=" + timeDisplayTurnsOff);
     f.println("ledIntensity=" + String(displayIntensity));
@@ -1045,19 +647,10 @@ String writeCityIds() {
     f.println("is24hour=" + String(IS_24HOUR));
     f.println("isPM=" + String(IS_PM));
     f.println("wideclockformat=" + Wide_Clock_Style);
-    f.println("isMetric=" + String(IS_METRIC));
-    f.println("refreshRate=" + String(minutesBetweenDataRefresh));
     f.println("minutesBetweenScrolling=" + String(minutesBetweenScrolling));
     f.println("www_username=" + String(www_username));
     f.println("www_password=" + String(www_password));
     f.println("IS_BASIC_AUTH=" + String(IS_BASIC_AUTH));
-    f.println("SHOW_CITY=" + String(SHOW_CITY));
-    f.println("SHOW_CONDITION=" + String(SHOW_CONDITION));
-    f.println("SHOW_HUMIDITY=" + String(SHOW_HUMIDITY));
-    f.println("SHOW_WIND=" + String(SHOW_WIND));
-    f.println("SHOW_PRESSURE=" + String(SHOW_PRESSURE));
-    f.println("SHOW_HIGHLOW=" + String(SHOW_HIGHLOW));
-    f.println("SHOW_DATE=" + String(SHOW_DATE));
     f.println("ENABLE_MQTT=" + String(ENABLE_MQTT));
     f.println("mqttDeviceId=" + mqttDeviceId);
     f.println("mqttUrl=" + mqttUrl);
@@ -1066,9 +659,6 @@ String writeCityIds() {
   }
   f.close();
   readCityIds();
-  weatherClient.updateCityIdList(CityIDs, 1);
-  String cityIds = weatherClient.getMyCityIDs();
-  return cityIds;
 }
 
 void readCityIds() {
@@ -1081,20 +671,6 @@ void readCityIds() {
   String line;
   while (fr.available()) {
     line = fr.readStringUntil('\n');
-    if (line.indexOf("TIMEDBKEY=") >= 0) {
-      TIMEDBKEY = line.substring(line.lastIndexOf("TIMEDBKEY=") + 10);
-      TIMEDBKEY.trim();
-      Serial.println("TIMEDBKEY: " + TIMEDBKEY);
-    }
-    if (line.indexOf("APIKEY=") >= 0) {
-      APIKEY = line.substring(line.lastIndexOf("APIKEY=") + 7);
-      APIKEY.trim();
-      Serial.println("APIKEY: " + APIKEY);
-    }
-    if (line.indexOf("CityID=") >= 0) {
-      CityIDs[0] = line.substring(line.lastIndexOf("CityID=") + 7).toInt();
-      Serial.println("CityID: " + String(CityIDs[0]));
-    }
     if (line.indexOf("isFlash=") >= 0) {
       flashOnSeconds = line.substring(line.lastIndexOf("isFlash=") + 8).toInt();
       Serial.println("flashOnSeconds=" + String(flashOnSeconds));
@@ -1112,26 +688,10 @@ void readCityIds() {
       Wide_Clock_Style.trim();
       Serial.println("Wide_Clock_Style=" + Wide_Clock_Style);
     }
-    if (line.indexOf("isMetric=") >= 0) {
-      IS_METRIC = line.substring(line.lastIndexOf("isMetric=") + 9).toInt();
-      Serial.println("IS_METRIC=" + String(IS_METRIC));
-    }
-    if (line.indexOf("refreshRate=") >= 0) {
-      minutesBetweenDataRefresh = line.substring(line.lastIndexOf("refreshRate=") + 12).toInt();
-      if (minutesBetweenDataRefresh == 0) {
-        minutesBetweenDataRefresh = 15; // can't be zero
-      }
-      Serial.println("minutesBetweenDataRefresh=" + String(minutesBetweenDataRefresh));
-    }
     if (line.indexOf("minutesBetweenScrolling=") >= 0) {
       displayRefreshCount = 1;
       minutesBetweenScrolling = line.substring(line.lastIndexOf("minutesBetweenScrolling=") + 24).toInt();
       Serial.println("minutesBetweenScrolling=" + String(minutesBetweenScrolling));
-    }
-    if (line.indexOf("marqueeMessage=") >= 0) {
-      marqueeMessage = line.substring(line.lastIndexOf("marqueeMessage=") + 15);
-      marqueeMessage.trim();
-      Serial.println("marqueeMessage=" + marqueeMessage);
     }
     if (line.indexOf("timeDisplayTurnsOn=") >= 0) {
       timeDisplayTurnsOn = line.substring(line.lastIndexOf("timeDisplayTurnsOn=") + 19);
@@ -1154,53 +714,23 @@ void readCityIds() {
     if (line.indexOf("www_username=") >= 0) {
       String temp = line.substring(line.lastIndexOf("www_username=") + 13);
       temp.trim();
-      temp.toCharArray(www_username, sizeof(temp));
+      www_username = temp;
       Serial.println("www_username=" + String(www_username));
     }
     if (line.indexOf("www_password=") >= 0) {
       String temp = line.substring(line.lastIndexOf("www_password=") + 13);
       temp.trim();
-      temp.toCharArray(www_password, sizeof(temp));
+      www_password = temp;
       Serial.println("www_password=" + String(www_password));
     }
     if (line.indexOf("IS_BASIC_AUTH=") >= 0) {
       IS_BASIC_AUTH = line.substring(line.lastIndexOf("IS_BASIC_AUTH=") + 14).toInt();
       Serial.println("IS_BASIC_AUTH=" + String(IS_BASIC_AUTH));
     }
-    if (line.indexOf("SHOW_CITY=") >= 0) {
-      SHOW_CITY = line.substring(line.lastIndexOf("SHOW_CITY=") + 10).toInt();
-      Serial.println("SHOW_CITY=" + String(SHOW_CITY));
-    }
-    if (line.indexOf("SHOW_CONDITION=") >= 0) {
-      SHOW_CONDITION = line.substring(line.lastIndexOf("SHOW_CONDITION=") + 15).toInt();
-      Serial.println("SHOW_CONDITION=" + String(SHOW_CONDITION));
-    }
-    if (line.indexOf("SHOW_HUMIDITY=") >= 0) {
-      SHOW_HUMIDITY = line.substring(line.lastIndexOf("SHOW_HUMIDITY=") + 14).toInt();
-      Serial.println("SHOW_HUMIDITY=" + String(SHOW_HUMIDITY));
-    }
-    if (line.indexOf("SHOW_WIND=") >= 0) {
-      SHOW_WIND = line.substring(line.lastIndexOf("SHOW_WIND=") + 10).toInt();
-      Serial.println("SHOW_WIND=" + String(SHOW_WIND));
-    }
-    if (line.indexOf("SHOW_PRESSURE=") >= 0) {
-      SHOW_PRESSURE = line.substring(line.lastIndexOf("SHOW_PRESSURE=") + 14).toInt();
-      Serial.println("SHOW_PRESSURE=" + String(SHOW_PRESSURE));
-    }
-
-    if (line.indexOf("SHOW_HIGHLOW=") >= 0) {
-      SHOW_HIGHLOW = line.substring(line.lastIndexOf("SHOW_HIGHLOW=") + 13).toInt();
-      Serial.println("SHOW_HIGHLOW=" + String(SHOW_HIGHLOW));
-    }
-    
-    if (line.indexOf("SHOW_DATE=") >= 0) {
-      SHOW_DATE = line.substring(line.lastIndexOf("SHOW_DATE=") + 10).toInt();
-      Serial.println("SHOW_DATE=" + String(SHOW_DATE));
-    }
-
     if (line.indexOf("ENABLE_MQTT=") >= 0) {
       ENABLE_MQTT = line.substring(line.lastIndexOf("ENABLE_MQTT=") + 12).toInt();
       Serial.println("ENABLE_MQTT=" + String(ENABLE_MQTT));
+      //ENABLE_MQTT = false;
     }
     if (line.indexOf("mqttUrl=") >= 0) {
       mqttUrl = line.substring(line.lastIndexOf("mqttUrl=") + 8);
@@ -1221,25 +751,25 @@ void readCityIds() {
   }
   fr.close();
   matrix.setIntensity(displayIntensity);
-  weatherClient.updateWeatherApiKey(APIKEY);
-  weatherClient.setMetric(IS_METRIC);
-  weatherClient.updateCityIdList(CityIDs, 1);
 }
 
 void scrollMessage(String msg) {
   msg += " "; // add a space at the end
-  for ( int i = 0 ; i < width * msg.length() + matrix.width() - 1 - spacer; i++ ) {
+  for ( unsigned int i = 0 ; i < width * msg.length() + matrix.width() - 1 - spacer; i++ ) {
     if (WEBSERVER_ENABLED) {
       server.handleClient();
     }
     if (ENABLE_OTA) {
       ArduinoOTA.handle();
     }
+    if (ENABLE_MQTT) {
+      mqttClient.loop();
+    }
     if (refresh == 1) i = 0;
     refresh = 0;
     matrix.fillScreen(LOW);
 
-    int letter = i / width;
+    unsigned int letter = i / width;
     int x = (matrix.width() - 1) - i % width;
     int y = (matrix.height() - 8) / 2; // center the text vertically
 
@@ -1267,7 +797,7 @@ void centerPrint(String msg, boolean extraStuff) {
 
   // Print the static portions of the display before the main Message
   if (extraStuff) {
-    if (!IS_24HOUR && IS_PM && isPM()) {
+    if (!IS_24HOUR && IS_PM && timeClient.isPM()) {
       matrix.drawPixel(matrix.width() - 1, 6, HIGH);
     }
   }
@@ -1276,33 +806,4 @@ void centerPrint(String msg, boolean extraStuff) {
   matrix.print(msg);
 
   matrix.write();
-}
-
-String decodeHtmlString(String msg) {
-  String decodedMsg = msg;
-  // Restore special characters that are misformed to %char by the client browser
-  decodedMsg.replace("+", " ");
-  decodedMsg.replace("%21", "!");
-  decodedMsg.replace("%22", "");
-  decodedMsg.replace("%23", "#");
-  decodedMsg.replace("%24", "$");
-  decodedMsg.replace("%25", "%");
-  decodedMsg.replace("%26", "&");
-  decodedMsg.replace("%27", "'");
-  decodedMsg.replace("%28", "(");
-  decodedMsg.replace("%29", ")");
-  decodedMsg.replace("%2A", "*");
-  decodedMsg.replace("%2B", "+");
-  decodedMsg.replace("%2C", ",");
-  decodedMsg.replace("%2F", "/");
-  decodedMsg.replace("%3A", ":");
-  decodedMsg.replace("%3B", ";");
-  decodedMsg.replace("%3C", "<");
-  decodedMsg.replace("%3D", "=");
-  decodedMsg.replace("%3E", ">");
-  decodedMsg.replace("%3F", "?");
-  decodedMsg.replace("%40", "@");
-  decodedMsg.toUpperCase();
-  decodedMsg.trim();
-  return decodedMsg;
 }

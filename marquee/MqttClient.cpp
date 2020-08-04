@@ -9,16 +9,11 @@ void MqttClient::connect(String url, int port, String topic, String deviceId) {
     deviceId.trim();
     client = PubSubClient(wifiClient);
     deviceId += "-" + String(random(0xffff), HEX);
-    IPAddress ip;
-    //if(ip.fromString(url.c_str())){
-    //    Serial.println("MQTT with IP as " + deviceId);
-    //    client.setServer(ip, port);
-    //} else {
-        Serial.println("MQTT with domain as " + deviceId);
-        client.setServer(url.c_str(), port);
-    //}
+    Serial.println("MQTT with domain as " + deviceId);
+    client.setServer(url.c_str(), port);
     int i = 0;
     while (!client.connected() && i < 5) {
+        delay(20);
         if (!client.connect(deviceId.c_str())) {
             i++;
             Serial.println("MQTT connection error! on " + url + ":" + String(port) + " state=" + String(client.state()));
