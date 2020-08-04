@@ -22,18 +22,9 @@ SOFTWARE.
 */
 
 #pragma once
-#include <ESP8266WiFi.h>
-#include <ESP8266WebServer.h>
-#include <ESP8266HTTPUpdateServer.h>
-#include <WiFiManager.h> // --> https://github.com/tzapu/WiFiManager
-#include <ArduinoOTA.h>
-#include <Adafruit_GFX.h> // --> https://github.com/adafruit/Adafruit-GFX-Library
-#include <Max72xxPanel.h> // --> https://github.com/markruys/arduino-Max72xxPanel
-#include "MqttClient.h"
-#include "WebserverHelpers.h"
-#include "TimeService.h"
-#include "Storage.h"
-
+#include "Arduino.h"
+#define VERSION "2.16"
+#define HOSTNAME "CLOCK-"
 
 /******************************************************************************
  * This is designed for the Wemos D1 ESP8266
@@ -48,6 +39,8 @@ SOFTWARE.
 const int pinCS = D6; // Attach CS to this pin, DIN to MOSI and CLK to SCK (cf http://arduino.cc/en/Reference/SPI )
 const int numberOfHorizontalDisplays = 4; // default 4 for standard 4 x 1 display Max size of 16
 const int numberOfVerticalDisplays = 1; // default 1 for a single row height
+// Change the externalLight to the pin you wish to use if other than the Built-in LED
+const int STATUS_LED = LED_BUILTIN; // LED_BUILTIN is is the built in LED on the Wemos
 
 const int WEBSERVER_PORT = 80; // The port you can access this device on over HTTP
 const boolean WEBSERVER_ENABLED = true;  // Device will provide a web interface via http://[ip]:[port]/

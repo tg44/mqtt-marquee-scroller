@@ -1,16 +1,15 @@
-
 #include "MqttClient.h"
 
-MqttClient::MqttClient() {}
+MqttClient::MqttClient(): client(wifiClient) {}
 
 void MqttClient::connect(String url, int port, String topic, String deviceId) {
     url.trim();
     topic.trim();
     deviceId.trim();
-    client = PubSubClient(wifiClient);
     deviceId += "-" + String(random(0xffff), HEX);
     Serial.println("MQTT with domain as " + deviceId);
     client.setServer(url.c_str(), port);
+    client.setSocketTimeout(60);
     int i = 0;
     while (!client.connected() && i < 5) {
         delay(20);

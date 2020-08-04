@@ -1,4 +1,5 @@
-#include "Settings.h"
+#pragma once
+#include "Arduino.h"
 
 
 static const char WEB_ACTIONS1[] PROGMEM = "<a class='w3-bar-item w3-button' href='/'><i class='fas fa-home'></i> Home</a>"
@@ -42,49 +43,4 @@ static const char MQTT_FORM[] PROGMEM = "<form class='w3-container' action='/sav
                         "<label>MQTT topic</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttTopic' value='%MQTTTOPIC%'>"
                         "<button class='w3-button w3-block w3-green w3-section w3-padding' type='submit'>Save</button></form>"
                         "<script>function isNumberKey(e){var h=e.which?e.which:event.keyCode;return!(h>31&&(h<48||h>57))}</script>";
-
-
-String createFooter(int8_t rssi, const char* version) {
-  Serial.print("Signal Strength (RSSI): ");
-  Serial.print(rssi);
-  Serial.println("%");
-  String html = "<br><br><br>";
-  html += "</div>";
-  html += "<footer class='w3-container w3-bottom w3-theme w3-margin-top'>";
-  html += "<i class='far fa-paper-plane'></i> Version: " + String(version) + "<br>";
-  html += "<i class='fas fa-rss'></i> Signal Strength: ";
-  html += String(rssi) + "%";
-  html += "</footer>";
-  html += "</body></html>";
-  return html;
-}
-
-String decodeHtmlString(String msg) {
-  String decodedMsg = msg;
-  // Restore special characters that are misformed to %char by the client browser
-  decodedMsg.replace("+", " ");
-  decodedMsg.replace("%21", "!");
-  decodedMsg.replace("%22", "");
-  decodedMsg.replace("%23", "#");
-  decodedMsg.replace("%24", "$");
-  decodedMsg.replace("%25", "%");
-  decodedMsg.replace("%26", "&");
-  decodedMsg.replace("%27", "'");
-  decodedMsg.replace("%28", "(");
-  decodedMsg.replace("%29", ")");
-  decodedMsg.replace("%2A", "*");
-  decodedMsg.replace("%2B", "+");
-  decodedMsg.replace("%2C", ",");
-  decodedMsg.replace("%2F", "/");
-  decodedMsg.replace("%3A", ":");
-  decodedMsg.replace("%3B", ";");
-  decodedMsg.replace("%3C", "<");
-  decodedMsg.replace("%3D", "=");
-  decodedMsg.replace("%3E", ">");
-  decodedMsg.replace("%3F", "?");
-  decodedMsg.replace("%40", "@");
-  decodedMsg.toUpperCase();
-  decodedMsg.trim();
-  return decodedMsg;
-}
 

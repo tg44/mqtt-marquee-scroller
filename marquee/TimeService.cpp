@@ -1,6 +1,16 @@
 #include "TimeService.h"
 
+/* Useful Constants */
 #define MANY_YEARS 1500000000
+#define SECS_PER_MIN  (60UL)
+#define SECS_PER_HOUR (3600UL)
+#define SECS_PER_DAY  (SECS_PER_HOUR * 24L)
+
+/* Useful Macros for getting elapsed time */
+#define numberOfSeconds(_time_) (_time_ % SECS_PER_MIN)
+#define numberOfMinutes(_time_) ((_time_ / SECS_PER_MIN) % SECS_PER_MIN)
+#define numberOfHours(_time_) (( _time_% SECS_PER_DAY) / SECS_PER_HOUR)
+#define elapsedDays(_time_) ( _time_ / SECS_PER_DAY)
 
 TimeService::TimeService() {}
 
@@ -20,7 +30,7 @@ int TimeService::hour() {
     if(epoch > MANY_YEARS) {
       return timeClient.getHours();
     } else {
-      return (((lastEpochFromApi + epoch + offset) % 86400L) / 3600);
+      return numberOfHours(lastEpochFromApi + epoch + offset);
     }
 }
 
@@ -29,7 +39,7 @@ int TimeService::minute() {
     if(epoch > MANY_YEARS) {
       return timeClient.getMinutes();
     } else {
-      return (((lastEpochFromApi + epoch + offset) % 3600) / 60);
+      return numberOfMinutes(lastEpochFromApi + epoch + offset);
     }
 }
 
@@ -38,7 +48,7 @@ int TimeService::second() {
     if(epoch > MANY_YEARS) {
       return timeClient.getSeconds();
     } else {
-      return ((lastEpochFromApi + epoch + offset) % 60);
+      return numberOfSeconds(lastEpochFromApi + epoch + offset);
     }
 }
 
