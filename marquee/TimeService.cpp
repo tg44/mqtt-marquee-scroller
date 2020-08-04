@@ -1,5 +1,7 @@
 #include "TimeService.h"
 
+#define MANY_YEARS 1500000000
+
 TimeService::TimeService() {}
 
 void TimeService::updateTime(){
@@ -8,21 +10,36 @@ void TimeService::updateTime(){
       started = true;
   }
   Serial.println("==== update time ===");
-  int offset = getOffset();
+  updateOffsetData();
   timeClient.setTimeOffset(offset);
   timeClient.forceUpdate();
 }
 
 int TimeService::hour() {
-    return timeClient.getHours();
+    long epoch = getEpoch();
+    if(epoch > MANY_YEARS) {
+      return timeClient.getHours();
+    } else {
+      return (((lastEpochFromApi + epoch + offset) % 86400L) / 3600);
+    }
 }
 
 int TimeService::minute() {
-    return timeClient.getMinutes();
+    long epoch = getEpoch();
+    if(epoch > MANY_YEARS) {
+      return timeClient.getMinutes();
+    } else {
+      return (((lastEpochFromApi + epoch + offset) % 3600) / 60);
+    }
 }
 
 int TimeService::second() {
-    return timeClient.getSeconds();
+    long epoch = getEpoch();
+    if(epoch > MANY_YEARS) {
+      return timeClient.getSeconds();
+    } else {
+      return ((lastEpochFromApi + epoch + offset) % 60);
+    }
 }
 
 int TimeService::get12hHourFormat() {
@@ -32,6 +49,10 @@ int TimeService::get12hHourFormat() {
     } else {
         return h % 12;
     }
+}
+
+long TimeService::getEpoch() {
+  return timeClient.getEpochTime() - offset; //bcs some reason they ruined epoch with the offset...
 }
 
 String TimeService::timeToConsole() {
@@ -58,7 +79,7 @@ String TimeService::zeroPad(int number) {
   }
 }
 
-int TimeService::getOffset()
+void TimeService::updateOffsetData()
 {
   WiFiClient client;
   String apiGetData = "GET /api/ip HTTP/1.1";
@@ -75,7 +96,7 @@ int TimeService::getOffset()
   else {
     Serial.println("connection for time data failed"); //error message if no client connect
     Serial.println();
-    return 0;
+    return;
   }
 
   while (client.connected() && !client.available()) delay(1); //waits for data
@@ -88,14 +109,14 @@ int TimeService::getOffset()
   if (strcmp(status, "HTTP/1.1 200 OK") != 0) {
     Serial.print(F("Unexpected response: "));
     Serial.println(status);
-    return 0;
+    return;
   }
 
   // Skip HTTP headers
   char endOfHeaders[] = "\r\n\r\n";
   if (!client.find(endOfHeaders)) {
     Serial.println(F("Invalid response"));
-    return 0;
+    return;
   }
 
   const size_t capacity = 1024;
@@ -103,7 +124,7 @@ int TimeService::getOffset()
   JsonObject& root = jsonBuffer.parseObject(client);
   if (!root.success()) {
     Serial.println(F("Time Data Parsing failed!"));
-    return 0;
+    return;
   }
 
   client.stop(); //stop client
@@ -117,5 +138,6 @@ int TimeService::getOffset()
   Serial.println("dstOffset: " + String(dstOffset));
   Serial.println("rawOffset: " + String(rawOffset));
 
-  return isDst ? rawOffset + dstOffset : rawOffset;
+  offset = isDst ? rawOffset + dstOffset : rawOffset;
+  lastEpochFromApi = unixtime;
 }

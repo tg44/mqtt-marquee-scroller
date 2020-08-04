@@ -8,7 +8,6 @@ class TimeService
 {
   public:
     TimeService();
-    int getOffset();
     void updateTime();
     bool isPM();
     int minute();
@@ -18,8 +17,12 @@ class TimeService
     String timeToConsole();
     String getAmPm();
     String zeroPad(int number);
+    long getEpoch();
     
   private:
+    void updateOffsetData();
+    int offset;
+    long lastEpochFromApi;
     bool started = false;
     String servername = "worldtimeapi.org";
     WiFiUDP ntpUDP;

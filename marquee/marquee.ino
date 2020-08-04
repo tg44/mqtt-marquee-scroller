@@ -30,7 +30,6 @@
 #define VERSION "2.16"
 
 #define HOSTNAME "CLOCK-"
-#define CONFIG "/conf.txt"
 #define BUZZER_PIN  D2
 
 /* Useful Constants */
@@ -55,8 +54,6 @@ String message = "hello";
 int spacer = 1;  // dots between letters
 int width = 5 + spacer; // The font width is 5 pixels + spacer
 Max72xxPanel matrix = Max72xxPanel(pinCS, numberOfHorizontalDisplays, numberOfVerticalDisplays);
-String Wide_Clock_Style = "1";  //1="hh:mm Temp", 2="hh:mm:ss", 3="hh:mm"
-float UtcOffset;  //time zone offsets that correspond with the CityID above (offset from GMT)
 
 // Time
 TimeService timeClient = TimeService();
@@ -77,10 +74,10 @@ int timeoutCount = 0;
 // Change the externalLight to the pin you wish to use if other than the Built-in LED
 int externalLight = LED_BUILTIN; // LED_BUILTIN is is the built in LED on the Wemos
 
+Storage s;
+
 void setup() {
   Serial.begin(115200);
-  SPIFFS.begin();
-  //SPIFFS.remove(CONFIG);
   delay(10);
 
   // Initialize digital pin for LED
@@ -89,7 +86,8 @@ void setup() {
   //New Line to clear from start garbage
   Serial.println();
 
-  readCityIds();
+  s.reload();
+  matrix.setIntensity(s.displayIntensity);
 
   Serial.println("Number of LED Displays: " + String(numberOfHorizontalDisplays));
   // initialize dispaly
@@ -97,7 +95,7 @@ void setup() {
 
   int maxPos = numberOfHorizontalDisplays * numberOfVerticalDisplays;
   for (int i = 0; i < maxPos; i++) {
-    matrix.setRotation(i, ledRotation);
+    matrix.setRotation(i, s.ledRotation);
     matrix.setPosition(i, maxPos - i - 1, 0);
   }
 
@@ -122,7 +120,7 @@ void setup() {
     delay(60);
   }
   delay(1000);
-  matrix.setIntensity(displayIntensity);
+  matrix.setIntensity(s.displayIntensity);
 
   //WiFiManager
   //Local intialization. Once its business is done, there is no need to keep it around
@@ -182,7 +180,7 @@ void setup() {
     server.on("/savemqtt", handleSaveMqtt);
     server.on("/configuremqtt", handleConfigureMqtt);
     server.onNotFound(redirectHome);
-    serverUpdater.setup(&server, "/update", www_username, www_password);
+    serverUpdater.setup(&server, "/update", s.www_username, s.www_password);
     // Start the server
     server.begin();
     Serial.println("Server started");
@@ -195,10 +193,10 @@ void setup() {
     scrollMessage("Web Interface is Disabled");
   }
   timeClient.updateTime();
-  if(ENABLE_MQTT){
+  if(s.ENABLE_MQTT){
     Serial.println("MQTT connect");
     scrollMessage("MQTT...");
-    mqttClient.connect(mqttUrl, mqttPort, mqttTopic, mqttDeviceId);
+    mqttClient.connect(s.mqttUrl, s.mqttPort, s.mqttTopic, s.mqttDeviceId);
     scrollMessage("...connected");
   }
 
@@ -223,10 +221,10 @@ void loop() {
     displayRefreshCount --;
     // Check to see if we need to Scroll some Data
     if (displayRefreshCount <= 0) {
-      displayRefreshCount = minutesBetweenScrolling;
+      displayRefreshCount = s.minutesBetweenScrolling;
       String msg;
       msg += " ";
-      if (ENABLE_MQTT) {
+      if (s.ENABLE_MQTT) {
         msg += mqttClient.getMessage();
       }
       if(msg.length() > 1) {
@@ -238,11 +236,11 @@ void loop() {
   String currentTime = hourMinutes(false);
 
   if (numberOfHorizontalDisplays >= 8) {
-    if (Wide_Clock_Style == "2") {
+    if (s.wide_Clock_Style == "2") {
       currentTime += secondsIndicator(false) + timeClient.zeroPad(timeClient.second());
       matrix.fillScreen(LOW); // show black
     }
-    if (Wide_Clock_Style == "3") {
+    if (s.wide_Clock_Style == "3") {
       // No change this is normal clock display
     }
   }
@@ -255,13 +253,13 @@ void loop() {
   if (ENABLE_OTA) {
     ArduinoOTA.handle();
   }
-  if (ENABLE_MQTT) {
+  if (s.ENABLE_MQTT) {
     mqttClient.loop();  //we need to loop as much as we can
   }
 }
 
 String hourMinutes(boolean isRefresh) {
-  if (IS_24HOUR) {
+  if (s.IS_24HOUR) {
     return timeClient.hour() + secondsIndicator(isRefresh) + timeClient.zeroPad(timeClient.minute());
   } else {
     return timeClient.get12hHourFormat() + secondsIndicator(isRefresh) + timeClient.zeroPad(timeClient.minute());
@@ -270,15 +268,15 @@ String hourMinutes(boolean isRefresh) {
 
 String secondsIndicator(boolean isRefresh) {
   String rtnValue = ":";
-  if (isRefresh == false && (flashOnSeconds && (timeClient.second() % 2) == 0)) {
+  if (isRefresh == false && (s.flashOnSeconds && (timeClient.second() % 2) == 0)) {
     rtnValue = " ";
   }
   return rtnValue;
 }
 
 boolean athentication() {
-  if (IS_BASIC_AUTH) {
-    return server.authenticate(www_username.c_str(), www_password.c_str());
+  if (s.IS_BASIC_AUTH) {
+    return server.authenticate(s.www_username.c_str(), s.www_password.c_str());
   }
   return true; // Authentication not required
 }
@@ -292,8 +290,8 @@ void handleSaveWideClock() {
     return server.requestAuthentication();
   }
   if (numberOfHorizontalDisplays >= 8) {
-    Wide_Clock_Style = server.arg("wideclockformat");
-    writeCityIds();
+    s.wide_Clock_Style = server.arg("wideclockformat");
+    s.serialize();
     matrix.fillScreen(LOW); // show black
   }
   redirectHome();
@@ -303,21 +301,22 @@ void handleLocations() {
   if (!athentication()) {
     return server.requestAuthentication();
   }
-  flashOnSeconds = server.hasArg("flashseconds");
-  IS_24HOUR = server.hasArg("is24hour");
-  IS_PM = server.hasArg("isPM");
-  timeDisplayTurnsOn = decodeHtmlString(server.arg("startTime"));
-  timeDisplayTurnsOff = decodeHtmlString(server.arg("endTime"));
-  displayIntensity = server.arg("ledintensity").toInt();
-  minutesBetweenScrolling = server.arg("refreshDisplay").toInt();
-  displayScrollSpeed = server.arg("scrollspeed").toInt();
-  IS_BASIC_AUTH = server.hasArg("isBasicAuth");
-  www_username = server.arg("userid");
-  www_password = server.arg("stationpassword");
+  s.flashOnSeconds = server.hasArg("flashseconds");
+  s.IS_24HOUR = server.hasArg("is24hour");
+  s.IS_PM = server.hasArg("isPM");
+  s.timeDisplayTurnsOn = decodeHtmlString(server.arg("startTime"));
+  s.timeDisplayTurnsOff = decodeHtmlString(server.arg("endTime"));
+  s.displayIntensity = server.arg("ledintensity").toInt();
+  s.minutesBetweenScrolling = server.arg("refreshDisplay").toInt();
+  s.displayScrollSpeed = server.arg("scrollspeed").toInt();
+  s.IS_BASIC_AUTH = server.hasArg("isBasicAuth");
+  s.www_username = server.arg("userid");
+  s.www_password = server.arg("stationpassword");
   matrix.fillScreen(LOW); // show black
-  writeCityIds();
+  s.serialize();
   timeClient.updateTime(); // this will force a data pull for new weather
   redirectHome();
+  matrix.setIntensity(s.displayIntensity);
 }
 
 void handleSystemReset() {
@@ -325,7 +324,7 @@ void handleSystemReset() {
     return server.requestAuthentication();
   }
   Serial.println("Reset System Configuration");
-  if (SPIFFS.remove(CONFIG)) {
+  if (s.resetToDefault()) {
     redirectHome();
     ESP.restart();
   }
@@ -361,7 +360,7 @@ void handleWideClockConfigure() {
     // Wide display options
     String form = FPSTR(WIDECLOCK_FORM);
     String clockOptions = "<option value='2'>HH:MM:SS</option><option value='3'>HH:MM</option>";
-    clockOptions.replace(Wide_Clock_Style + "'", Wide_Clock_Style + "' selected");
+    clockOptions.replace(s.wide_Clock_Style + "'", s.wide_Clock_Style + "' selected");
     form.replace("%WIDECLOCKOPTIONS%", clockOptions);
     server.sendContent(form);
   }
@@ -391,7 +390,7 @@ void handleConfigure() {
   String form = FPSTR(CHANGE_FORM1);
   
   String is24hourChecked = "";
-  if (IS_24HOUR) {
+  if (s.IS_24HOUR) {
     is24hourChecked = "checked='checked'";
   }
   form.replace("%IS_24HOUR_CHECKED%", is24hourChecked);
@@ -400,34 +399,34 @@ void handleConfigure() {
 
   form = FPSTR(CHANGE_FORM2);
   String isPmChecked = "";
-  if (IS_PM) {
+  if (s.IS_PM) {
     isPmChecked = "checked='checked'";
   }
   form.replace("%IS_PM_CHECKED%", isPmChecked);
   String isFlashSecondsChecked = "";
-  if (flashOnSeconds) {
+  if (s.flashOnSeconds) {
     isFlashSecondsChecked = "checked='checked'";
   }
   form.replace("%FLASHSECONDS%", isFlashSecondsChecked);
-  form.replace("%STARTTIME%", timeDisplayTurnsOn);
-  form.replace("%ENDTIME%", timeDisplayTurnsOff);
-  form.replace("%INTENSITYOPTIONS%", String(displayIntensity));
-  String dSpeed = String(displayScrollSpeed);
+  form.replace("%STARTTIME%", s.timeDisplayTurnsOn);
+  form.replace("%ENDTIME%", s.timeDisplayTurnsOff);
+  form.replace("%INTENSITYOPTIONS%", String(s.displayIntensity));
+  String dSpeed = String(s.displayScrollSpeed);
   String scrollOptions = "<option value='35'>Slow</option><option value='25'>Normal</option><option value='15'>Fast</option><option value='10'>Very Fast</option>";
   scrollOptions.replace(dSpeed + "'", dSpeed + "' selected" );
   form.replace("%SCROLLOPTIONS%", scrollOptions);
-  form.replace("%REFRESH_DISPLAY%", String(minutesBetweenScrolling));
+  form.replace("%REFRESH_DISPLAY%", String(s.minutesBetweenScrolling));
 
   server.sendContent(form); //Send another chunk of the form
 
   form = FPSTR(CHANGE_FORM3);
   String isUseSecurityChecked = "";
-  if (IS_BASIC_AUTH) {
+  if (s.IS_BASIC_AUTH) {
     isUseSecurityChecked = "checked='checked'";
   }
   form.replace("%IS_BASICAUTH_CHECKED%", isUseSecurityChecked);
-  form.replace("%USERID%", String(www_username));
-  form.replace("%STATIONPASSWORD%", String(www_password));
+  form.replace("%USERID%", s.www_username);
+  form.replace("%STATIONPASSWORD%", s.www_password);
 
   server.sendContent(form); // Send the second chunk of Data
 
@@ -472,12 +471,12 @@ void handleSaveMqtt() {
   if (!athentication()) {
     return server.requestAuthentication();
   }
-  ENABLE_MQTT = server.hasArg("mqttenable");
-  mqttDeviceId = server.arg("mqttDeviceName");
-  mqttUrl = server.arg("mqttUrl");
-  mqttPort = server.arg("mqttPort").toInt();
-  mqttTopic = server.arg("mqttTopic");
-  writeCityIds();
+  s.ENABLE_MQTT = server.hasArg("mqttenable");
+  s.mqttDeviceId = server.arg("mqttDeviceName");
+  s.mqttUrl = server.arg("mqttUrl");
+  s.mqttPort = server.arg("mqttPort").toInt();
+  s.mqttTopic = server.arg("mqttTopic");
+  s.serialize();
   redirectHome();
   ESP.restart();
 }
@@ -499,14 +498,14 @@ void handleConfigureMqtt() {
 
   String form = FPSTR(MQTT_FORM);
   String isMqttChecked = "";
-  if (ENABLE_MQTT) {
+  if (s.ENABLE_MQTT) {
     isMqttChecked = "checked='checked'";
   }
   form.replace("%MQTTCHECKED%", isMqttChecked);
-  form.replace("%MQTTDEVICE%", mqttDeviceId);
-  form.replace("%MQTTURL%", mqttUrl);
-  form.replace("%MQTTPORT%", String(mqttPort));
-  form.replace("%MQTTTOPIC%", mqttTopic);
+  form.replace("%MQTTDEVICE%", s.mqttDeviceId);
+  form.replace("%MQTTURL%", s.mqttUrl);
+  form.replace("%MQTTPORT%", String(s.mqttPort));
+  form.replace("%MQTTTOPIC%", s.mqttTopic);
   server.sendContent(form);
 
   server.sendContent(createFooter(getWifiQuality(), VERSION));
@@ -614,143 +613,22 @@ void enableDisplay(boolean enable) {
 
 // Toggle on and off the display if user defined times
 void checkDisplay() {
-  if (timeDisplayTurnsOn == "" || timeDisplayTurnsOff == "") {
+  if (s.timeDisplayTurnsOn == "" || s.timeDisplayTurnsOff == "") {
     return; // nothing to do
   }
   String currentTime = timeClient.zeroPad(timeClient.hour()) + ":" + timeClient.zeroPad(timeClient.minute());
 
-  if (currentTime == timeDisplayTurnsOn && !displayOn) {
+  if (currentTime == s.timeDisplayTurnsOn && !displayOn) {
     Serial.println("Time to turn display on: " + currentTime);
     flashLED(1, 500);
     enableDisplay(true);
   }
 
-  if (currentTime == timeDisplayTurnsOff && displayOn) {
+  if (currentTime == s.timeDisplayTurnsOff && displayOn) {
     Serial.println("Time to turn display off: " + currentTime);
     flashLED(2, 500);
     enableDisplay(false);
   }
-}
-
-void writeCityIds() {
-  // Save decoded message to SPIFFS file for playback on power up.
-  File f = SPIFFS.open(CONFIG, "w");
-  if (!f) {
-    Serial.println("File open failed!");
-  } else {
-    Serial.println("Saving settings now...");
-    f.println("timeDisplayTurnsOn=" + timeDisplayTurnsOn);
-    f.println("timeDisplayTurnsOff=" + timeDisplayTurnsOff);
-    f.println("ledIntensity=" + String(displayIntensity));
-    f.println("scrollSpeed=" + String(displayScrollSpeed));
-    f.println("isFlash=" + String(flashOnSeconds));
-    f.println("is24hour=" + String(IS_24HOUR));
-    f.println("isPM=" + String(IS_PM));
-    f.println("wideclockformat=" + Wide_Clock_Style);
-    f.println("minutesBetweenScrolling=" + String(minutesBetweenScrolling));
-    f.println("www_username=" + String(www_username));
-    f.println("www_password=" + String(www_password));
-    f.println("IS_BASIC_AUTH=" + String(IS_BASIC_AUTH));
-    f.println("ENABLE_MQTT=" + String(ENABLE_MQTT));
-    f.println("mqttDeviceId=" + mqttDeviceId);
-    f.println("mqttUrl=" + mqttUrl);
-    f.println("mqttPort=" + String(mqttPort));
-    f.println("mqttTopic=" + mqttTopic);
-  }
-  f.close();
-  readCityIds();
-}
-
-void readCityIds() {
-  if (SPIFFS.exists(CONFIG) == false) {
-    Serial.println("Settings File does not yet exists.");
-    writeCityIds();
-    return;
-  }
-  File fr = SPIFFS.open(CONFIG, "r");
-  String line;
-  while (fr.available()) {
-    line = fr.readStringUntil('\n');
-    if (line.indexOf("isFlash=") >= 0) {
-      flashOnSeconds = line.substring(line.lastIndexOf("isFlash=") + 8).toInt();
-      Serial.println("flashOnSeconds=" + String(flashOnSeconds));
-    }
-    if (line.indexOf("is24hour=") >= 0) {
-      IS_24HOUR = line.substring(line.lastIndexOf("is24hour=") + 9).toInt();
-      Serial.println("IS_24HOUR=" + String(IS_24HOUR));
-    }
-    if (line.indexOf("isPM=") >= 0) {
-      IS_PM = line.substring(line.lastIndexOf("isPM=") + 5).toInt();
-      Serial.println("IS_PM=" + String(IS_PM));
-    }
-    if (line.indexOf("wideclockformat=") >= 0) {
-      Wide_Clock_Style = line.substring(line.lastIndexOf("wideclockformat=") + 16);
-      Wide_Clock_Style.trim();
-      Serial.println("Wide_Clock_Style=" + Wide_Clock_Style);
-    }
-    if (line.indexOf("minutesBetweenScrolling=") >= 0) {
-      displayRefreshCount = 1;
-      minutesBetweenScrolling = line.substring(line.lastIndexOf("minutesBetweenScrolling=") + 24).toInt();
-      Serial.println("minutesBetweenScrolling=" + String(minutesBetweenScrolling));
-    }
-    if (line.indexOf("timeDisplayTurnsOn=") >= 0) {
-      timeDisplayTurnsOn = line.substring(line.lastIndexOf("timeDisplayTurnsOn=") + 19);
-      timeDisplayTurnsOn.trim();
-      Serial.println("timeDisplayTurnsOn=" + timeDisplayTurnsOn);
-    }
-    if (line.indexOf("timeDisplayTurnsOff=") >= 0) {
-      timeDisplayTurnsOff = line.substring(line.lastIndexOf("timeDisplayTurnsOff=") + 20);
-      timeDisplayTurnsOff.trim();
-      Serial.println("timeDisplayTurnsOff=" + timeDisplayTurnsOff);
-    }
-    if (line.indexOf("ledIntensity=") >= 0) {
-      displayIntensity = line.substring(line.lastIndexOf("ledIntensity=") + 13).toInt();
-      Serial.println("displayIntensity=" + String(displayIntensity));
-    }
-    if (line.indexOf("scrollSpeed=") >= 0) {
-      displayScrollSpeed = line.substring(line.lastIndexOf("scrollSpeed=") + 12).toInt();
-      Serial.println("displayScrollSpeed=" + String(displayScrollSpeed));
-    }
-    if (line.indexOf("www_username=") >= 0) {
-      String temp = line.substring(line.lastIndexOf("www_username=") + 13);
-      temp.trim();
-      www_username = temp;
-      Serial.println("www_username=" + String(www_username));
-    }
-    if (line.indexOf("www_password=") >= 0) {
-      String temp = line.substring(line.lastIndexOf("www_password=") + 13);
-      temp.trim();
-      www_password = temp;
-      Serial.println("www_password=" + String(www_password));
-    }
-    if (line.indexOf("IS_BASIC_AUTH=") >= 0) {
-      IS_BASIC_AUTH = line.substring(line.lastIndexOf("IS_BASIC_AUTH=") + 14).toInt();
-      Serial.println("IS_BASIC_AUTH=" + String(IS_BASIC_AUTH));
-    }
-    if (line.indexOf("ENABLE_MQTT=") >= 0) {
-      ENABLE_MQTT = line.substring(line.lastIndexOf("ENABLE_MQTT=") + 12).toInt();
-      Serial.println("ENABLE_MQTT=" + String(ENABLE_MQTT));
-      //ENABLE_MQTT = false;
-    }
-    if (line.indexOf("mqttUrl=") >= 0) {
-      mqttUrl = line.substring(line.lastIndexOf("mqttUrl=") + 8);
-      Serial.println("mqttUrl=" + String(mqttUrl));
-    }
-    if (line.indexOf("mqttPort=") >= 0) {
-      mqttPort = line.substring(line.lastIndexOf("mqttPort=") + 9).toInt();
-      Serial.println("mqttPort=" + String(mqttPort));
-    }
-    if (line.indexOf("mqttTopic=") >= 0) {
-      mqttTopic = line.substring(line.lastIndexOf("mqttTopic=") + 10);
-      Serial.println("mqttTopic=" + String(mqttTopic));
-    }
-    if (line.indexOf("mqttDeviceId=") >= 0) {
-      mqttDeviceId = line.substring(line.lastIndexOf("mqttDeviceId=") + 13);
-      Serial.println("mqttDeviceId=" + String(mqttDeviceId));
-    }
-  }
-  fr.close();
-  matrix.setIntensity(displayIntensity);
 }
 
 void scrollMessage(String msg) {
@@ -762,7 +640,7 @@ void scrollMessage(String msg) {
     if (ENABLE_OTA) {
       ArduinoOTA.handle();
     }
-    if (ENABLE_MQTT) {
+    if (s.ENABLE_MQTT) {
       mqttClient.loop();
     }
     if (refresh == 1) i = 0;
@@ -783,7 +661,7 @@ void scrollMessage(String msg) {
     }
 
     matrix.write(); // Send bitmap to display
-    delay(displayScrollSpeed);
+    delay(s.displayScrollSpeed);
   }
   matrix.setCursor(0, 0);
 }
@@ -797,7 +675,7 @@ void centerPrint(String msg, boolean extraStuff) {
 
   // Print the static portions of the display before the main Message
   if (extraStuff) {
-    if (!IS_24HOUR && IS_PM && timeClient.isPM()) {
+    if (!s.IS_24HOUR && s.IS_PM && timeClient.isPM()) {
       matrix.drawPixel(matrix.width() - 1, 6, HIGH);
     }
   }
