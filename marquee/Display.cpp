@@ -1,3 +1,6 @@
+// (c) 2018 David Payne
+// This code is licensed under MIT license (see LICENSE.txt for details)
+
 #include "Display.h"
 
 Display::Display(int _pinCS, int _numberOfHorizontalDisplays, int _numberOfVerticalDisplays, StatusLed& _statusLed, TimeService& _timeClient, std::function<void(void)> _loop): 

@@ -1,3 +1,6 @@
+// (c) 2020 Gergo Torcsvari
+// This code is licensed under MIT license (see LICENSE.txt for details)
+
 #pragma once
 #include "Arduino.h"
 

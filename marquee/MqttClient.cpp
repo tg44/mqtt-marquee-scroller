@@ -1,19 +1,24 @@
+// (c) 2020 Gergo Torcsvari
+// This code is licensed under MIT license (see LICENSE.txt for details)
+
 #include "MqttClient.h"
 
 MqttClient::MqttClient(): client(wifiClient) {}
 
-void MqttClient::connect(String url, int port, String topic, String deviceId) {
+void MqttClient::connect(String url, int port, String _topic, String deviceId) {
+    topic = _topic;
     url.trim();
     topic.trim();
     deviceId.trim();
     deviceId += "-" + String(random(0xffff), HEX);
-    Serial.println("MQTT with domain as " + deviceId);
+    mqttDeviceId = deviceId;
+    Serial.println("MQTT with domain as " + mqttDeviceId);
     client.setServer(url.c_str(), port);
     client.setSocketTimeout(60);
     int i = 0;
     while (!client.connected() && i < 5) {
         delay(20);
-        if (!client.connect(deviceId.c_str())) {
+        if (!client.connect(mqttDeviceId.c_str())) {
             i++;
             Serial.println("MQTT connection error! on " + url + ":" + String(port) + " state=" + String(client.state()));
             delay(2000);
@@ -49,6 +54,12 @@ void MqttClient::loop() {
 }
 
 String MqttClient::getMessage() {
+    if(!client.connected()){
+        if(client.connect(mqttDeviceId.c_str())) {
+            client.subscribe(topic.c_str());
+            Serial.println("MQTT Reconnected");
+        }
+    }
     loop();
     String ret = msg;
     msg = "";

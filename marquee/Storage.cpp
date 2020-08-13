@@ -1,3 +1,6 @@
+// (c) 2018 David Payne
+// This code is licensed under MIT license (see LICENSE.txt for details)
+
 #include "Storage.h"
 
 Storage::Storage(){

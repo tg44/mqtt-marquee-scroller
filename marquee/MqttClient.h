@@ -1,3 +1,6 @@
+// (c) 2020 Gergo Torcsvari
+// This code is licensed under MIT license (see LICENSE.txt for details)
+
 #pragma once
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
@@ -18,4 +21,6 @@ class MqttClient
     WiFiClient wifiClient;
     String msg = "";
     boolean connected = false;
+    String mqttDeviceId = "";
+    String topic = "";
 };
