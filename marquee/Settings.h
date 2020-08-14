@@ -18,7 +18,6 @@
 // DIN -> D7 (MOSI)
 const int pinCS = D6; // Attach CS to this pin, DIN to MOSI and CLK to SCK (cf http://arduino.cc/en/Reference/SPI )
 const int numberOfHorizontalDisplays = 4; // default 4 for standard 4 x 1 display Max size of 16
-const int numberOfVerticalDisplays = 1; // default 1 for a single row height
 // Change the externalLight to the pin you wish to use if other than the Built-in LED
 const int STATUS_LED = LED_BUILTIN; // LED_BUILTIN is is the built in LED on the Wemos
 

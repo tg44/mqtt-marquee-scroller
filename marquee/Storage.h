@@ -17,7 +17,6 @@ class Storage {
   public:
     boolean IS_24HOUR = false; // 23:00 millitary 24 hour clock
     boolean IS_PM = true; // Show PM indicator on Clock when in AM/PM mode
-    String wide_Clock_Style = "1";  //1="hh:mm Temp", 2="hh:mm:ss", 3="hh:mm"
     boolean IS_BASIC_AUTH = false;  // Use Basic Authorization for Configuration security on Web Interface
     String www_username = "admin";  // User account for the Web Interface
     String www_password = "password";  // Password for the Web Interface
@@ -41,6 +40,7 @@ class Storage {
     String mqttUrl = "";
     int mqttPort = 1883;
     String mqttTopic = ""; 
+    String mqttFaceTopic = "tele/marquee-scroller/face";
     String mqttDeviceId = "marquee-scroller";
 
     void serialize();

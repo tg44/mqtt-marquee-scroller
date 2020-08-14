@@ -29,11 +29,6 @@ void Storage::reload() {
             IS_PM = line.substring(line.lastIndexOf("isPM=") + 5).toInt();
             Serial.println("IS_PM=" + String(IS_PM));
         }
-        if (line.indexOf("wideclockformat=") >= 0) {
-            wide_Clock_Style = line.substring(line.lastIndexOf("wideclockformat=") + 16);
-            wide_Clock_Style.trim();
-            Serial.println("Wide_Clock_Style=" + wide_Clock_Style);
-        }
         if (line.indexOf("minutesBetweenScrolling=") >= 0) {
             minutesBetweenScrolling = line.substring(line.lastIndexOf("minutesBetweenScrolling=") + 24).toInt();
             Serial.println("minutesBetweenScrolling=" + String(minutesBetweenScrolling));
@@ -86,6 +81,10 @@ void Storage::reload() {
             mqttTopic = line.substring(line.lastIndexOf("mqttTopic=") + 10);
             Serial.println("mqttTopic=" + String(mqttTopic));
         }
+        if (line.indexOf("mqttFaceTopic=") >= 0) {
+            mqttFaceTopic = line.substring(line.lastIndexOf("mqttFaceTopic=") + 14);
+            Serial.println("mqttFaceTopic=" + String(mqttFaceTopic));
+        }
         if (line.indexOf("mqttDeviceId=") >= 0) {
             mqttDeviceId = line.substring(line.lastIndexOf("mqttDeviceId=") + 13);
             Serial.println("mqttDeviceId=" + String(mqttDeviceId));
@@ -108,7 +107,6 @@ void Storage::serialize() {
     f.println("isFlash=" + String(flashOnSeconds));
     f.println("is24hour=" + String(IS_24HOUR));
     f.println("isPM=" + String(IS_PM));
-    f.println("wideclockformat=" + wide_Clock_Style);
     f.println("minutesBetweenScrolling=" + String(minutesBetweenScrolling));
     f.println("www_username=" + String(www_username));
     f.println("www_password=" + String(www_password));
@@ -118,6 +116,7 @@ void Storage::serialize() {
     f.println("mqttUrl=" + mqttUrl);
     f.println("mqttPort=" + String(mqttPort));
     f.println("mqttTopic=" + mqttTopic);
+    f.println("mqttFaceTopic=" + mqttFaceTopic);
   }
   f.close();
   reload();

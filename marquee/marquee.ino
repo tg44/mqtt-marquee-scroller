@@ -29,7 +29,7 @@ TimeService timeClient = TimeService();
 MqttClient mqttClient = MqttClient();
 StatusLed processing(STATUS_LED);
 Storage s;
-Display display(pinCS, numberOfHorizontalDisplays, numberOfVerticalDisplays, processing, timeClient, smallLoop);
+Display display(pinCS, numberOfHorizontalDisplays, processing, timeClient, smallLoop);
 WebServer server(WEBSERVER_PORT, s, processing, String(VERSION), display, timeClient);
 
 void setup() {
@@ -78,10 +78,9 @@ void setup() {
   if(s.ENABLE_MQTT){
     Serial.println("MQTT connect");
     display.scrollMessage("MQTT...", s.displayScrollSpeed);
-    mqttClient.connect(s.mqttUrl, s.mqttPort, s.mqttTopic, s.mqttDeviceId);
+    mqttClient.connect(s.mqttUrl, s.mqttPort, s.mqttTopic, s.mqttFaceTopic, s.mqttDeviceId);
     display.scrollMessage("...connected", s.displayScrollSpeed);
   }
-
   processing.flashLED(5, 80);
 }
 
@@ -112,32 +111,66 @@ void loop() {
     }
   }
 
-  String currentTime = hourMinutes(false);
-  //handle wide mode
-  if (numberOfHorizontalDisplays >= 8) {
-    if (s.wide_Clock_Style == "2") {
-      currentTime += secondsIndicator(false) + timeClient.zeroPad(timeClient.second());
-    }
-  }
-  display.clear();
-  display.centerPrint(currentTime, true, s.IS_24HOUR, s.IS_PM);
+  showTimePlate();
   smallLoop();
 }
 
-String hourMinutes(boolean isRefresh) {
-  if (s.IS_24HOUR) {
-    return timeClient.hour() + secondsIndicator(isRefresh) + timeClient.zeroPad(timeClient.minute());
-  } else {
-    return timeClient.get12hHourFormat() + secondsIndicator(isRefresh) + timeClient.zeroPad(timeClient.minute());
+void showTimePlate() {
+  if(mqttClient.faceModified){
+    display.clear();
+    mqttClient.faceModified = false;
   }
-}
-
-String secondsIndicator(boolean isRefresh) {
-  String rtnValue = ":";
-  if (isRefresh == false && (s.flashOnSeconds && (timeClient.second() % 2) == 0)) {
-    rtnValue = " ";
+  boolean empty = true;
+  for(byte i=0; i<8; i++){
+    if(mqttClient.panelFace[i].faceType!=0){
+      empty = false;
+      break;
+    }
   }
-  return rtnValue;
+  if(empty){
+    if(numberOfHorizontalDisplays >= 8){
+      display.showTime(1, true, s.IS_24HOUR, s.IS_PM, s.flashOnSeconds);
+    } else if(numberOfHorizontalDisplays >= 6) {
+      display.showTime(0, true, s.IS_24HOUR, s.IS_PM, s.flashOnSeconds);
+    } else if(numberOfHorizontalDisplays >= 4) {
+      display.showTime(0, false, s.IS_24HOUR, s.IS_PM, s.flashOnSeconds);
+    }
+    return;
+  }
+  for(byte i=0; i<8; i++){
+    if(mqttClient.panelFace[i].faceType==0){
+      continue;
+    } else if(mqttClient.panelFace[i].faceType==1){
+      if(i+4 >= numberOfHorizontalDisplays){
+        display.showTime(i, false, s.IS_24HOUR, s.IS_PM, s.flashOnSeconds);
+        i+=3;
+      } else if(mqttClient.panelFace[i+4].faceType != 0) {
+        display.showTime(i, false, s.IS_24HOUR, s.IS_PM, s.flashOnSeconds);
+        i+=3;
+      } else if(i+6 <= numberOfHorizontalDisplays) {
+        if(mqttClient.panelFace[i+5].faceType == 0 && mqttClient.panelFace[i+6].faceType == 0) {
+          display.showTime(i, true, s.IS_24HOUR, s.IS_PM, s.flashOnSeconds);
+          i+=5;
+        } else {
+          display.showTime(i, false, s.IS_24HOUR, s.IS_PM, s.flashOnSeconds);
+          i+=3;
+        }
+      }
+    } else if(mqttClient.panelFace[i].faceType==2) {
+      if(i+1 >= numberOfHorizontalDisplays || mqttClient.panelFace[i+1].faceType != 0){
+        display.showSmallBinaryTime(i);
+      } else {
+        display.showLargeBinaryTime(i);
+        i++;
+      }
+    } else if(mqttClient.panelFace[i].faceType==3) {
+      display.showPercentage(i, mqttClient.panelFace[i].percent, s.flashOnSeconds);
+    } else if(mqttClient.panelFace[i].faceType==4) {
+      display.showCharacter(i, mqttClient.panelFace[i].character);
+    } else {
+      continue;
+    }
+  }
 }
 
 void configModeCallback (WiFiManager *myWiFiManager) {

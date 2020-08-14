@@ -8,7 +8,7 @@
 static const char WEB_ACTIONS1[] PROGMEM = "<a class='w3-bar-item w3-button' href='/'><i class='fas fa-home'></i> Home</a>"
                         "<a class='w3-bar-item w3-button' href='/configure'><i class='fas fa-cog'></i> Configure</a>";
 
-static const char WEB_ACTIONS2[] PROGMEM = "<a class='w3-bar-item w3-button' href='/configuremqtt'><i class='fab fa-stream'></i> MQTT</a>"
+static const char WEB_ACTIONS2[] PROGMEM = "<a class='w3-bar-item w3-button' href='/configuremqtt'><i class='fab fa-buffer'></i> MQTT</a>"
                         "<a class='w3-bar-item w3-button' href='/pull'><i class='fas fa-cloud-download-alt'></i> Refresh Data</a>"
                         "<a class='w3-bar-item w3-button' href='/display'>";
 
@@ -34,16 +34,13 @@ static const char CHANGE_FORM3[] PROGMEM = "<hr><p><input name='isBasicAuth' cla
                       "<p><button class='w3-button w3-block w3-green w3-section w3-padding' type='submit'>Save</button></p></form>"
                       "<script>function isNumberKey(e){var h=e.which?e.which:event.keyCode;return!(h>31&&(h<48||h>57))}</script>";
 
-static const char WIDECLOCK_FORM[] PROGMEM = "<form class='w3-container' action='/savewideclock' method='get'><h2>Wide Clock Configuration:</h2>"
-                          "<p>Wide Clock Display Format <select class='w3-option w3-padding' name='wideclockformat'>%WIDECLOCKOPTIONS%</select></p>"
-                          "<button class='w3-button w3-block w3-grey w3-section w3-padding' type='submit'>Save</button></form>";
-
 static const char MQTT_FORM[] PROGMEM = "<form class='w3-container' action='/savemqtt' method='get'><h2>MQTT Configuration:</h2>"
                         "<p><input name='mqttenable' class='w3-check w3-margin-top' type='checkbox' %MQTTCHECKED%> Enable MQTT</p>"
                         "<label>MQTT device name</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttDeviceName' value='%MQTTDEVICE%' maxlength='60'>"
                         "<label>MQTT URL (do not include http://)</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttUrl' value='%MQTTURL%' maxlength='60'>"
                         "<label>MQTT Port</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttPort' value='%MQTTPORT%' maxlength='5'  onkeypress='return isNumberKey(event)'>"
                         "<label>MQTT topic</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttTopic' value='%MQTTTOPIC%'>"
+                        "<label>MQTT face topic</label><input class='w3-input w3-border w3-margin-bottom' type='text' name='mqttFaceTopic' value='%MQTTFACETOPIC%'>"
                         "<button class='w3-button w3-block w3-green w3-section w3-padding' type='submit'>Save</button></form>"
                         "<script>function isNumberKey(e){var h=e.which?e.which:event.keyCode;return!(h>31&&(h<48||h>57))}</script>";
 

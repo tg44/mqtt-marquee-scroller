@@ -32,11 +32,9 @@ class WebServer{
     //handlers
     void handleConfigureMqtt();
     void handleSaveMqtt();
-    void handleSaveWideClock();
     void handleLocations();
     void handleDisplay();
     void handleConfigure();
-    void handleWideClockConfigure();
     void handleForgetWifi();
     void handleSystemReset();
     void handlePull();

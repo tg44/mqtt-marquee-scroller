@@ -15,11 +15,9 @@ void WebServer::init(){
     server.on("/", std::bind(&WebServer::handleConfigure, this));
     server.on("/pull", std::bind(&WebServer::handlePull, this));
     server.on("/locations", std::bind(&WebServer::handleLocations, this));
-    server.on("/savewideclock", std::bind(&WebServer::handleSaveWideClock, this));
     server.on("/systemreset", std::bind(&WebServer::handleSystemReset, this));
     server.on("/forgetwifi", std::bind(&WebServer::handleForgetWifi, this));
     server.on("/configure", std::bind(&WebServer::handleConfigure, this));
-    server.on("/configurewideclock", std::bind(&WebServer::handleWideClockConfigure, this));
     server.on("/display", std::bind(&WebServer::handleDisplay, this));
     server.on("/savemqtt", std::bind(&WebServer::handleSaveMqtt, this));
     server.on("/configuremqtt", std::bind(&WebServer::handleConfigureMqtt, this));
@@ -32,19 +30,6 @@ void WebServer::init(){
     String webAddress = "http://" + WiFi.localIP().toString() + ":" + String(port) + "/";
     Serial.println("Use this URL : " + webAddress);
 }
-
-void WebServer::handleSaveWideClock() {
-  if (!athentication()) {
-    return server.requestAuthentication();
-  }
-  if (display.numberOfHorizontalDisplays >= 8) {
-    s.wide_Clock_Style = server.arg("wideclockformat");
-    s.serialize();
-    display.clear();
-  }
-  redirectHome();
-}
-
 
 void WebServer::handleLocations() {
   if (!athentication()) {
@@ -92,6 +77,7 @@ void WebServer::handleConfigureMqtt() {
   form.replace("%MQTTURL%", s.mqttUrl);
   form.replace("%MQTTPORT%", String(s.mqttPort));
   form.replace("%MQTTTOPIC%", s.mqttTopic);
+  form.replace("%MQTTFACETOPIC%", s.mqttFaceTopic);
   server.sendContent(form);
 
   server.sendContent(createFooter(getWifiQuality(), version));
@@ -127,36 +113,6 @@ void WebServer::handleForgetWifi() {
   WiFiManager wifiManager;
   wifiManager.resetSettings();
   ESP.restart();
-}
-
-void WebServer::handleWideClockConfigure() {
-  if (!athentication()) {
-    return server.requestAuthentication();
-  }
-  processing.on();
-
-  server.sendHeader("Cache-Control", "no-cache, no-store");
-  server.sendHeader("Pragma", "no-cache");
-  server.sendHeader("Expires", "-1");
-  server.setContentLength(CONTENT_LENGTH_UNKNOWN);
-  server.send(200, "text/html", "");
-
-  sendHeader();
-
-  if (display.numberOfHorizontalDisplays >= 8) {
-    // Wide display options
-    String form = FPSTR(WIDECLOCK_FORM);
-    String clockOptions = "<option value='2'>HH:MM:SS</option><option value='3'>HH:MM</option>";
-    clockOptions.replace(s.wide_Clock_Style + "'", s.wide_Clock_Style + "' selected");
-    form.replace("%WIDECLOCKOPTIONS%", clockOptions);
-    server.sendContent(form);
-  }
-
-  server.sendContent(createFooter(getWifiQuality(), version));
-
-  server.sendContent("");
-  server.client().stop();
-  processing.off();
 }
 
 void WebServer::handleConfigure() {
@@ -246,6 +202,7 @@ void WebServer::handleSaveMqtt() {
   s.mqttUrl = server.arg("mqttUrl");
   s.mqttPort = server.arg("mqttPort").toInt();
   s.mqttTopic = server.arg("mqttTopic");
+  s.mqttFaceTopic = server.arg("mqttFaceTopic");
   s.serialize();
   redirectHome();
   ESP.restart();
