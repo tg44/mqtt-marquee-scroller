@@ -97,13 +97,15 @@ void Display::init(int ledRotation){
 void Display::welcome(int intensity){
   centerPrint("hello");
 
-  for (int inx = 0; inx <= 15; inx++) {
-    setBrightness(inx);
-    delay(100);
-  }
-  for (int inx = 15; inx >= 0; inx--) {
-    setBrightness(inx);
-    delay(60);
+  for (int rep = 0; rep < 3; rep++) {
+    for (int inx = 0; inx <= 15; inx++) {
+      setBrightness(inx);
+      delay(50);
+    }
+    for (int inx = 15; inx >= 0; inx--) {
+      setBrightness(inx);
+      delay(50);
+    }
   }
   delay(1000);
   setBrightness(intensity);
@@ -211,9 +213,9 @@ void Display::showTime(byte panel, boolean large, boolean IS_24HOUR, boolean IS_
 
 String Display::hourMinutes(boolean IS_24HOUR, boolean flashOnSeconds) {
   if (IS_24HOUR) {
-    return timeClient.hour() + secondsIndicator(flashOnSeconds) + timeClient.zeroPad(timeClient.minute());
+    return String(timeClient.hour()) + secondsIndicator(flashOnSeconds) + timeClient.zeroPad(timeClient.minute());
   } else {
-    return timeClient.get12hHourFormat() + secondsIndicator(flashOnSeconds) + timeClient.zeroPad(timeClient.second());
+    return String(timeClient.get12hHourFormat()) + secondsIndicator(flashOnSeconds) + timeClient.zeroPad(timeClient.second());
   }
 }
 

@@ -3,19 +3,26 @@
 
 #include "MqttClient.h"
 
+const size_t MQTT_BUFFER_SIZE=2046;
+
 MqttClient::MqttClient(): client(wifiClient) {}
 
-void MqttClient::connect(String url, int port, String _topic, String _faceTopic, String deviceId) {
+void MqttClient::connect(String _url, int _port, String _topic, String _faceTopic, String _deviceId) {
+    deviceId = _deviceId;
     topic = _topic;
     faceTopic = _faceTopic;
+    url = _url;
+    port = _port;
     url.trim();
     topic.trim();
+    faceTopic.trim();
     deviceId.trim();
-    deviceId += "-" + String(random(0xffff), HEX);
-    mqttDeviceId = deviceId;
+    mqttDeviceId = deviceId + "-" + String(random(0xffff), HEX);
     Serial.println("MQTT with domain as " + mqttDeviceId);
     client.setServer(url.c_str(), port);
     client.setSocketTimeout(60);
+    client.setKeepAlive(60);
+    client.setBufferSize(MQTT_BUFFER_SIZE);
     int i = 0;
     while (!client.connected() && i < 5) {
         delay(20);
@@ -26,8 +33,10 @@ void MqttClient::connect(String url, int port, String _topic, String _faceTopic,
         } else {
             std::function<void(char*, uint8_t*, unsigned int)> f = std::bind(&MqttClient::callback, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3);
             client.setCallback(f);
-            client.subscribe(topic.c_str());
-            client.subscribe(faceTopic.c_str());
+            Serial.println(topic);
+            Serial.println(client.subscribe(topic.c_str(), 1));
+            Serial.println(faceTopic);
+            Serial.println(client.subscribe(faceTopic.c_str(), 1));
             connected = true;
             Serial.println("MQTT CONNECTED!!! topic: " + topic);
         }
@@ -35,8 +44,7 @@ void MqttClient::connect(String url, int port, String _topic, String _faceTopic,
 }
 
 void MqttClient::callback(char* in_topic, uint8_t* payload, unsigned int length) {
-  const size_t bufferSize = 710;
-  DynamicJsonBuffer jsonBuffer(bufferSize);
+  DynamicJsonBuffer jsonBuffer(MQTT_BUFFER_SIZE);
   JsonObject& root = jsonBuffer.parseObject(payload);
   if (!root.success()) {
     Serial.println("MQTT json parse error!");
@@ -65,19 +73,25 @@ void MqttClient::callback(char* in_topic, uint8_t* payload, unsigned int length)
 void MqttClient::loop() {
     if(connected){
         if(!client.loop()) {
-            Serial.println("MQTT DC :(");
+            Serial.println("MQTT dc! on " + url + ":" + String(port) + " state=" + String(client.state()));
+            reconnect();
         }
     }
 }
 
-String MqttClient::getMessage() {
+void MqttClient::reconnect() {
     if(!client.connected()){
+        //mqttDeviceId = deviceId + "-" + String(random(0xffff), HEX);
         if(client.connect(mqttDeviceId.c_str())) {
             client.subscribe(topic.c_str());
             client.subscribe(faceTopic.c_str());
             Serial.println("MQTT Reconnected");
         }
+        Serial.println(client.state());
     }
+}
+
+String MqttClient::getMessage() {
     loop();
     String ret = msg;
     msg = "";

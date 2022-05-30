@@ -1,0 +1,3 @@
+[submodule "marquee/libs/arduino-Max72xxPanel"]
+	path = marquee/libs/arduino-Max72xxPanel
+	url = git@github.com:markruys/arduino-Max72xxPanel.git

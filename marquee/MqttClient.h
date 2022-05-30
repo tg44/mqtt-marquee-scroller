@@ -25,10 +25,14 @@ class MqttClient
 
   private:
     void callback(char* topic, byte* payload, unsigned int length);
+    void reconnect();
     PubSubClient client;
     WiFiClient wifiClient;
     String msg = "";
     boolean connected = false;
+    String url = "";
+    int port = 0;
+    String deviceId = "";
     String mqttDeviceId = "";
     String topic = "";
     String faceTopic = "";
