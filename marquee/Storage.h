@@ -31,6 +31,7 @@ class Storage {
     3: 90 degrees counter clockwise (default)
     */
     int ledRotation = 3;
+    int utcOffsetSeconds = 3600; // Fallback UTC offset in seconds, used when API is unavailable (3600 = UTC+1)
     String timeDisplayTurnsOn = "06:30";  // 24 Hour Format HH:MM -- Leave blank for always on. (ie 05:30)
     String timeDisplayTurnsOff = "23:00"; // 24 Hour Format HH:MM -- Leave blank for always on. Both must be set to work.
     /*

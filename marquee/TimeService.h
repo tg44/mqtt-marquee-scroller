@@ -2,7 +2,6 @@
 // This code is licensed under MIT license (see LICENSE.txt for details)
 
 #pragma once
-#include <ArduinoJson.h>
 #include <NTPClient.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>
@@ -11,7 +10,7 @@ class TimeService
 {
   public:
     TimeService();
-    void updateTime();
+    void updateTime(int fallbackOffsetSeconds);
     bool isPM();
     int minute();
     int hour();
@@ -21,13 +20,12 @@ class TimeService
     String getAmPm();
     String zeroPad(int number);
     long getEpoch();
-    
+
   private:
-    void updateOffsetData();
-    int offset;
-    long lastEpochFromApi;
+    bool updateOffsetFromApi();
+    int offset = 0;
+    bool apiSuccess = false;
     bool started = false;
-    String servername = "worldtimeapi.org";
     WiFiUDP ntpUDP;
     NTPClient timeClient = NTPClient(ntpUDP, "2.europe.pool.ntp.org");
 };

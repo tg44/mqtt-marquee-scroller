@@ -35,6 +35,7 @@ void WebServer::handleLocations() {
   if (!athentication()) {
     return server.requestAuthentication();
   }
+  s.utcOffsetSeconds = server.arg("utcoffsethours").toInt() * 3600;
   s.flashOnSeconds = server.hasArg("flashseconds");
   s.IS_24HOUR = server.hasArg("is24hour");
   s.IS_PM = server.hasArg("isPM");
@@ -48,7 +49,7 @@ void WebServer::handleLocations() {
   s.www_password = server.arg("stationpassword");
   display.clear();
   s.serialize();
-  timeClient.updateTime(); // this will force a data pull for new weather
+  timeClient.updateTime(s.utcOffsetSeconds); // this will force a data pull for new weather
   redirectHome();
   display.setBrightness(s.displayIntensity);
 }
@@ -89,7 +90,7 @@ void WebServer::handleConfigureMqtt() {
 
 
 void WebServer::handlePull() {
-  timeClient.updateTime();
+  timeClient.updateTime(s.utcOffsetSeconds);
 }
 
 void WebServer::handleSystemReset() {
@@ -131,7 +132,9 @@ void WebServer::handleConfigure() {
   sendHeader();
 
   String form = FPSTR(CHANGE_FORM1);
-  
+
+  form.replace("%UTCOFFSETHOURS%", String(s.utcOffsetSeconds / 3600));
+
   String is24hourChecked = "";
   if (s.IS_24HOUR) {
     is24hourChecked = "checked='checked'";

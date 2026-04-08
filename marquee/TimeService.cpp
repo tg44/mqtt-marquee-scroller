@@ -2,57 +2,105 @@
 // This code is licensed under MIT license (see LICENSE.txt for details)
 
 #include "TimeService.h"
-
-/* Useful Constants */
-#define MANY_YEARS 1500000000
-#define SECS_PER_MIN  (60UL)
-#define SECS_PER_HOUR (3600UL)
-#define SECS_PER_DAY  (SECS_PER_HOUR * 24L)
-
-/* Useful Macros for getting elapsed time */
-#define numberOfSeconds(_time_) (_time_ % SECS_PER_MIN)
-#define numberOfMinutes(_time_) ((_time_ / SECS_PER_MIN) % SECS_PER_MIN)
-#define numberOfHours(_time_) (( _time_% SECS_PER_DAY) / SECS_PER_HOUR)
-#define elapsedDays(_time_) ( _time_ / SECS_PER_DAY)
+#include <ArduinoJson.h>
 
 TimeService::TimeService() {}
 
-void TimeService::updateTime(){
+void TimeService::updateTime(int fallbackOffsetSeconds){
   if(!started) {
       timeClient.begin();
       started = true;
   }
   Serial.println("==== update time ===");
-  updateOffsetData();
+
+  if (!updateOffsetFromApi()) {
+    if (!apiSuccess) {
+      offset = fallbackOffsetSeconds;
+      Serial.println("Using fallback offset: " + String(offset) + "s");
+    } else {
+      Serial.println("API failed, keeping last known offset: " + String(offset) + "s");
+    }
+  }
+
   timeClient.setTimeOffset(offset);
   timeClient.forceUpdate();
 }
 
-int TimeService::hour() {
-    long epoch = getEpoch();
-    if(epoch > MANY_YEARS) {
-      return timeClient.getHours();
-    } else {
-      return numberOfHours(lastEpochFromApi + epoch + offset);
+bool TimeService::updateOffsetFromApi() {
+  WiFiClient client;
+  Serial.println("Getting timezone from ip-api.com");
+
+  if (!client.connect("ip-api.com", 80)) {
+    Serial.println("API connection failed");
+    return false;
+  }
+
+  client.println("GET /json/?fields=status,timezone,offset HTTP/1.1");
+  client.println("Host: ip-api.com");
+  client.println("User-Agent: ArduinoWiFi/1.1");
+  client.println("Connection: close");
+  client.println();
+
+  unsigned long timeout = millis();
+  while (client.connected() && !client.available()) {
+    if (millis() - timeout > 5000) {
+      Serial.println("API timeout");
+      client.stop();
+      return false;
     }
+    delay(10);
+  }
+
+  char status[32] = {0};
+  client.readBytesUntil('\r', status, sizeof(status));
+  if (strcmp(status, "HTTP/1.1 200 OK") != 0) {
+    Serial.print(F("Unexpected response: "));
+    Serial.println(status);
+    client.stop();
+    return false;
+  }
+
+  char endOfHeaders[] = "\r\n\r\n";
+  if (!client.find(endOfHeaders)) {
+    Serial.println(F("Invalid response"));
+    client.stop();
+    return false;
+  }
+
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, client);
+  client.stop();
+
+  if (error) {
+    Serial.println(F("Timezone parsing failed!"));
+    return false;
+  }
+
+  const char* apiStatus = doc["status"];
+  if (!apiStatus || strcmp(apiStatus, "success") != 0) {
+    Serial.println(F("API returned failure status"));
+    return false;
+  }
+
+  offset = (int)doc["offset"];
+  const char* tz = doc["timezone"];
+  Serial.println("Timezone: " + String(tz ? tz : "unknown"));
+  Serial.println("API offset: " + String(offset) + "s");
+
+  apiSuccess = true;
+  return true;
+}
+
+int TimeService::hour() {
+    return timeClient.getHours();
 }
 
 int TimeService::minute() {
-    long epoch = getEpoch();
-    if(epoch > MANY_YEARS) {
-      return timeClient.getMinutes();
-    } else {
-      return numberOfMinutes(lastEpochFromApi + epoch + offset);
-    }
+    return timeClient.getMinutes();
 }
 
 int TimeService::second() {
-    long epoch = getEpoch();
-    if(epoch > MANY_YEARS) {
-      return timeClient.getSeconds();
-    } else {
-      return numberOfSeconds(lastEpochFromApi + epoch + offset);
-    }
+    return timeClient.getSeconds();
 }
 
 int TimeService::get12hHourFormat() {
@@ -65,7 +113,7 @@ int TimeService::get12hHourFormat() {
 }
 
 long TimeService::getEpoch() {
-  return timeClient.getEpochTime() - offset; //bcs some reason they ruined epoch with the offset...
+  return timeClient.getEpochTime();
 }
 
 String TimeService::timeToConsole() {
@@ -90,66 +138,4 @@ String TimeService::zeroPad(int number) {
   } else {
     return String(number);
   }
-}
-
-void TimeService::updateOffsetData()
-{
-  WiFiClient client;
-  String apiGetData = "GET /api/ip HTTP/1.1";
-  Serial.println("Getting Time Data");
-  Serial.println(apiGetData);
-  String result = "";
-  if (client.connect(servername, 80)) {  //starts client connection, checks for connection
-    client.println(apiGetData);
-    client.println("Host: " + servername);
-    client.println("User-Agent: ArduinoWiFi/1.1");
-    client.println("Connection: close");
-    client.println();
-  }
-  else {
-    Serial.println("connection for time data failed"); //error message if no client connect
-    Serial.println();
-    return;
-  }
-
-  while (client.connected() && !client.available()) delay(1); //waits for data
-
-  Serial.println("Waiting for data");
-
-  char status[32] = {0};
-  client.readBytesUntil('\r', status, sizeof(status));
-  Serial.println("Response Header: " + String(status));
-  if (strcmp(status, "HTTP/1.1 200 OK") != 0) {
-    Serial.print(F("Unexpected response: "));
-    Serial.println(status);
-    return;
-  }
-
-  // Skip HTTP headers
-  char endOfHeaders[] = "\r\n\r\n";
-  if (!client.find(endOfHeaders)) {
-    Serial.println(F("Invalid response"));
-    return;
-  }
-
-  JsonDocument doc;
-  DeserializationError error = deserializeJson(doc, client);
-  if (error) {
-    Serial.println(F("Time Data Parsing failed!"));
-    return;
-  }
-
-  client.stop(); //stop client
-
-  int rawOffset = (int)doc["raw_offset"];
-  int dstOffset = (int)doc["dst_offset"];
-  bool isDst = (bool)doc["dst"];
-  unsigned long unixtime  = (long)doc["unixtime"];
-  Serial.println("unixtime: " + String(unixtime));
-  Serial.println("isDst: " + String(isDst));
-  Serial.println("dstOffset: " + String(dstOffset));
-  Serial.println("rawOffset: " + String(rawOffset));
-
-  offset = isDst ? rawOffset + dstOffset : rawOffset;
-  lastEpochFromApi = unixtime;
 }

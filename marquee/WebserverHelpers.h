@@ -18,6 +18,7 @@ static const char WEB_ACTION3[] PROGMEM = "</a><a class='w3-bar-item w3-button' 
                        "<a class='w3-bar-item w3-button' href='https://github.com/Qrome/marquee-scroller' target='_blank'><i class='fas fa-question-circle'></i> About</a>";
 
 static const char CHANGE_FORM1[] PROGMEM = "<form class='w3-container' action='/locations' method='get'><h2>Configure:</h2>"
+                      "<p>Fallback UTC Offset (hours, used when auto-detect fails) <input class='w3-border w3-margin-bottom' name='utcoffsethours' type='number' min='-12' max='14' value='%UTCOFFSETHOURS%'></p>"
                       "<p><input name='is24hour' class='w3-check w3-margin-top' type='checkbox' %IS_24HOUR_CHECKED%> Use 24 Hour Clock (military time)</p>";
 
 static const char CHANGE_FORM2[] PROGMEM = "<p><input name='isPM' class='w3-check w3-margin-top' type='checkbox' %IS_PM_CHECKED%> Show PM indicator (only 12h format)</p>"

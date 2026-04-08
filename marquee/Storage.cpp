@@ -61,6 +61,10 @@ void Storage::reload() {
             www_password.trim();
             Serial.println("www_password=" + String(www_password));
         }
+        if (line.indexOf("utcOffsetSeconds=") >= 0) {
+            utcOffsetSeconds = line.substring(line.lastIndexOf("utcOffsetSeconds=") + 17).toInt();
+            Serial.println("utcOffsetSeconds=" + String(utcOffsetSeconds));
+        }
         if (line.indexOf("IS_BASIC_AUTH=") >= 0) {
             IS_BASIC_AUTH = line.substring(line.lastIndexOf("IS_BASIC_AUTH=") + 14).toInt();
             Serial.println("IS_BASIC_AUTH=" + String(IS_BASIC_AUTH));
@@ -110,6 +114,7 @@ void Storage::serialize() {
     f.println("minutesBetweenScrolling=" + String(minutesBetweenScrolling));
     f.println("www_username=" + String(www_username));
     f.println("www_password=" + String(www_password));
+    f.println("utcOffsetSeconds=" + String(utcOffsetSeconds));
     f.println("IS_BASIC_AUTH=" + String(IS_BASIC_AUTH));
     f.println("ENABLE_MQTT=" + String(ENABLE_MQTT));
     f.println("mqttDeviceId=" + mqttDeviceId);

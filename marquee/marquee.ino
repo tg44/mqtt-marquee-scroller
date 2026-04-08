@@ -73,7 +73,7 @@ void setup() {
     display.scrollMessage("Web Interface is Disabled", s.displayScrollSpeed);
   }
 
-  timeClient.updateTime();
+  timeClient.updateTime(s.utcOffsetSeconds);
 
   if(s.ENABLE_MQTT){
     Serial.println("MQTT connect");
@@ -90,7 +90,7 @@ void loop() {
   if (lastMinute != timeClient.zeroPad(timeClient.minute())) {
     lastMinute = timeClient.zeroPad(timeClient.minute());
     if(timeClient.minute() % 15 == 0){
-      timeClient.updateTime();
+      timeClient.updateTime(s.utcOffsetSeconds);
     }
     if (display.isOn()) {
       display.enableDisplay(true);
