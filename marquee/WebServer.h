@@ -5,10 +5,10 @@
 
 #include <ESP8266WebServer.h>
 #include <ESP8266HTTPUpdateServer.h>
-#include <WiFiManager.h> // --> https://github.com/tzapu/WiFiManager
+#include <WiFiManager.h>
+#include <ArduinoJson.h>
 #include "Storage.h"
 #include "StatusLed.h"
-#include "WebserverHelpers.h"
 #include "Display.h"
 #include "TimeService.h"
 
@@ -29,22 +29,23 @@ class WebServer{
     String version;
     Display& display;
     TimeService& timeClient;
-    //handlers
-    void handleConfigureMqtt();
-    void handleSaveMqtt();
-    void handleLocations();
-    void handleDisplay();
-    void handleConfigure();
-    void handleForgetWifi();
-    void handleSystemReset();
-    void handlePull();
 
-    //utils
+    // SPA
+    void handleRoot();
+
+    // JSON API
+    void handleApiGetSettings();
+    void handleApiPostSettings();
+    void handleApiGetMqtt();
+    void handleApiPostMqtt();
+    void handleApiGetStatus();
+    void handleApiDisplayToggle();
+    void handleApiNtpRefresh();
+    void handleApiReset();
+    void handleApiForgetWifi();
+
+    // Utils
     boolean athentication();
-    void sendHeader();
-    void redirectHome();
-    void displayMessage(String message);
-    String decodeHtmlString(String msg);
-    String createFooter(int8_t rssi, String version);
-
+    void sendJson(int code, JsonDocument& doc);
+    void sendOk();
 };

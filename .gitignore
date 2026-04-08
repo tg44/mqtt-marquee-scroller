@@ -6,3 +6,6 @@
 .idea
 .vscode
 .DS_Store
+node_modules
+webui/dist
+marquee/webapp.h
