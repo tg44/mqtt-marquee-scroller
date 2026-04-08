@@ -32,6 +32,8 @@ class Display{
     void showLargeBinaryTime(byte panel);
     void showSmallBinaryTime(byte panel);
     void showCharacter(byte panel, char c);
+    void setRawPanel(byte panel, byte pixels[8]);
+    bool getPixel(int x, int y);
     int numberOfHorizontalDisplays;
 
   private:

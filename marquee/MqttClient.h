@@ -7,10 +7,11 @@
 #include <ArduinoJson.h>
 
 struct PanelFace {
-  // 0 - empty, 1 - clock, 2 - binary, 3 - percent, 4 - char
+  // 0 - empty, 1 - clock, 2 - binary, 3 - percent, 4 - char, 5 - raw
   byte faceType = 0;
   byte percent = 0;
   char character = ' ';
+  byte rawPixels[8] = {0}; // 8 rows, each byte = 8 cols (bit per pixel)
 };
 
 class MqttClient
@@ -19,6 +20,9 @@ class MqttClient
     MqttClient();
     void connect(String url, int port, String topic, String faceTopic, String deviceId);
     String getMessage();
+    String getLastMessage();
+    String getAccumulatedMessage();
+    boolean isConnected();
     void loop();
     PanelFace panelFace[8];
     boolean faceModified = false;
@@ -29,6 +33,7 @@ class MqttClient
     PubSubClient client;
     WiFiClient wifiClient;
     String msg = "";
+    String lastMsg = "";
     boolean connected = false;
     String url = "";
     int port = 0;

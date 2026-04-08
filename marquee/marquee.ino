@@ -30,7 +30,7 @@ MqttClient mqttClient = MqttClient();
 StatusLed processing(STATUS_LED);
 Storage s;
 Display display(pinCS, numberOfHorizontalDisplays, processing, timeClient, smallLoop);
-WebServer server(WEBSERVER_PORT, s, processing, String(VERSION), display, timeClient);
+WebServer server(WEBSERVER_PORT, s, processing, String(VERSION), display, timeClient, mqttClient);
 
 void setup() {
   Serial.begin(115200);
@@ -167,6 +167,8 @@ void showTimePlate() {
       display.showPercentage(i, mqttClient.panelFace[i].percent, s.flashOnSeconds);
     } else if(mqttClient.panelFace[i].faceType==4) {
       display.showCharacter(i, mqttClient.panelFace[i].character);
+    } else if(mqttClient.panelFace[i].faceType==5) {
+      display.setRawPanel(i, mqttClient.panelFace[i].rawPixels);
     } else {
       continue;
     }

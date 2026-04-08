@@ -6,6 +6,7 @@
   let { current, onNavigate }: Props = $props();
 
   const tabs = [
+    { id: 'dashboard', label: 'Dashboard' },
     { id: 'settings', label: 'Settings' },
     { id: 'mqtt', label: 'MQTT' },
     { id: 'actions', label: 'Actions' },

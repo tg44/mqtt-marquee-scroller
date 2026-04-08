@@ -201,6 +201,19 @@ void Display::showCharacter(byte panel, char c) {
   matrix.write();
 }
 
+bool Display::getPixel(int x, int y) {
+  return matrix.getPixel(x, y);
+}
+
+void Display::setRawPanel(byte panel, byte pixels[8]) {
+  for (byte row = 0; row < 8; row++) {
+    for (byte col = 0; col < 8; col++) {
+      matrix.drawPixel(panel * 8 + col, row, (pixels[row] & (1 << (7 - col))) ? HIGH : LOW);
+    }
+  }
+  matrix.write();
+}
+
 void Display::showTime(byte panel, boolean large, boolean IS_24HOUR, boolean IS_PM, boolean flashOnSeconds) {
   String currentTime = hourMinutes(IS_24HOUR, flashOnSeconds);
   if (large) {

@@ -61,8 +61,37 @@ Types;
  - 2 binary clock face (1 or 2 panels)
  - 3 percentage (1 panel) needs a `p` parameter with a 0-100 value
  - 4 character (1 panel) needs a `c` parameter with a 1 char long string
+ - 5 raw pixels (1+ panels) — pixel data sent via the raw topic
 
  The abowe example will show a binary clock in the first two panels, a 70% panel on third and a 10% panel as fourth. This can be useful if you want to switch some progress indication for example when you printing on your 3d printer, or you count down externally.
+
+#### Raw pixels via Face Topic
+
+Face type `5` (raw) allows drawing arbitrary pixel patterns. Raw pixel data is sent inline in the face topic using a `pixels` array:
+
+```json
+{
+  "panels": [
+    { "t": 5, "pixels": [
+        [0,0,1,1,1,1,0,0],
+        [0,1,0,0,0,0,1,0],
+        [1,0,0,1,0,1,0,0],
+        [1,0,0,0,0,0,0,0],
+        [1,0,0,1,0,1,0,0],
+        [0,1,0,0,1,0,1,0],
+        [0,0,1,1,1,1,0,0],
+        [0,0,0,0,0,0,0,0]
+      ]
+    },
+    { "t": 0 },
+    { "t": 1 },
+    { "t": 0 }
+  ]
+}
+```
+
+- `pixels`: 8 rows x 8 columns, values `0` (LED off) or `1` (LED on)
+- Can be combined with other face types in the same message
 
 #### Streamig data
 The original project did it stuffs in the MCU. This fork do its stuff with "microservices". For example, if you want weather data, you can use [weather2mqtt](https://github.com/tg44/weather2mqtt) to streaming weather data to a topic, and you can convert and repeat it with [mqtt-transformer](https://github.com/tg44/mqtt-transformer). Adding new capabilities can be added in any language rather fast.

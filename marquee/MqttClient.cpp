@@ -53,6 +53,7 @@ void MqttClient::callback(char* in_topic, uint8_t* payload, unsigned int length)
   if (strcmp(in_topic,topic.c_str())==0){
     String newMsg = String((const char*)doc["message"]);
     msg += " " + newMsg;
+    lastMsg = newMsg;
     Serial.println("MQTT msg json parse finished! " + newMsg);
     return;
   }
@@ -62,12 +63,25 @@ void MqttClient::callback(char* in_topic, uint8_t* payload, unsigned int length)
        panelFace[i].percent = (byte)doc["panels"][i]["p"];
        String str = doc["panels"][i]["c"].as<String>();
        panelFace[i].character = str.length() > 0 ? str.charAt(0) : ' ';
+       // Parse inline raw pixels if face type is 5
+       if (panelFace[i].faceType == 5) {
+         JsonArray pixels = doc["panels"][i]["pixels"].as<JsonArray>();
+         for (byte row = 0; row < 8; row++) {
+           byte rowByte = 0;
+           if (row < pixels.size()) {
+             JsonArray rowArr = pixels[row].as<JsonArray>();
+             for (int bit = 0; bit < 8 && bit < (int)rowArr.size(); bit++) {
+               if ((int)rowArr[bit]) rowByte |= (1 << (7 - bit));
+             }
+           }
+           panelFace[i].rawPixels[row] = rowByte;
+         }
+       }
     }
     faceModified = true;
     Serial.println("MQTT face json parse finished!");
     return;
   }
-  
 }
 
 void MqttClient::loop() {
@@ -81,7 +95,6 @@ void MqttClient::loop() {
 
 void MqttClient::reconnect() {
     if(!client.connected()){
-        //mqttDeviceId = deviceId + "-" + String(random(0xffff), HEX);
         if(client.connect(mqttDeviceId.c_str())) {
             client.subscribe(topic.c_str());
             client.subscribe(faceTopic.c_str());
@@ -96,4 +109,16 @@ String MqttClient::getMessage() {
     String ret = msg;
     msg = "";
     return ret;
+}
+
+String MqttClient::getLastMessage() {
+    return lastMsg;
+}
+
+String MqttClient::getAccumulatedMessage() {
+    return msg;
+}
+
+boolean MqttClient::isConnected() {
+    return connected && client.connected();
 }

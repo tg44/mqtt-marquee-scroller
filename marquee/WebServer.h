@@ -11,11 +11,12 @@
 #include "StatusLed.h"
 #include "Display.h"
 #include "TimeService.h"
+#include "MqttClient.h"
 
 class WebServer{
 
   public:
-    WebServer(int prt, Storage& st, StatusLed& proce, String ver, Display& disp, TimeService& tc);
+    WebServer(int prt, Storage& st, StatusLed& proce, String ver, Display& disp, TimeService& tc, MqttClient& mqtt);
     void init();
     void handleClient();
     int8_t getWifiQuality();
@@ -29,6 +30,7 @@ class WebServer{
     String version;
     Display& display;
     TimeService& timeClient;
+    MqttClient& mqttClient;
 
     // SPA
     void handleRoot();
@@ -39,7 +41,12 @@ class WebServer{
     void handleApiGetMqtt();
     void handleApiPostMqtt();
     void handleApiGetStatus();
+    void handleApiGetDashboard();
     void handleApiDisplayToggle();
+    void handleApiGetDisplayPixels();
+    void handleApiPostBrightness();
+    void handleApiPostFaces();
+    void handleApiPostRaw();
     void handleApiNtpRefresh();
     void handleApiReset();
     void handleApiForgetWifi();
