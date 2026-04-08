@@ -2,7 +2,7 @@
 // This code is licensed under MIT license (see LICENSE.txt for details)
 
 #pragma once
-#include "libs/ArduinoJson/ArduinoJson.h"
+#include <ArduinoJson.h>
 #include <NTPClient.h>
 #include <ESP8266WiFi.h>
 #include <WiFiUdp.h>

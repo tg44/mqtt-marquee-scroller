@@ -4,7 +4,7 @@
 #pragma once
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
-#include "libs/ArduinoJson/ArduinoJson.h"
+#include <ArduinoJson.h>
 
 struct PanelFace {
   // 0 - empty, 1 - clock, 2 - binary, 3 - percent, 4 - char

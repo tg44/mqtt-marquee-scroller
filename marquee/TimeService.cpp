@@ -132,20 +132,19 @@ void TimeService::updateOffsetData()
     return;
   }
 
-  const size_t capacity = 1024;
-  DynamicJsonBuffer jsonBuffer(capacity);
-  JsonObject& root = jsonBuffer.parseObject(client);
-  if (!root.success()) {
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, client);
+  if (error) {
     Serial.println(F("Time Data Parsing failed!"));
     return;
   }
 
   client.stop(); //stop client
-  
-  int rawOffset = (int)root["raw_offset"];
-  int dstOffset = (int)root["dst_offset"];
-  bool isDst = (bool)root["dst"];
-  unsigned long unixtime  = (long)root["unixtime"];
+
+  int rawOffset = (int)doc["raw_offset"];
+  int dstOffset = (int)doc["dst_offset"];
+  bool isDst = (bool)doc["dst"];
+  unsigned long unixtime  = (long)doc["unixtime"];
   Serial.println("unixtime: " + String(unixtime));
   Serial.println("isDst: " + String(isDst));
   Serial.println("dstOffset: " + String(dstOffset));

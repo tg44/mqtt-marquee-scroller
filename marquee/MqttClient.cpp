@@ -44,23 +44,23 @@ void MqttClient::connect(String _url, int _port, String _topic, String _faceTopi
 }
 
 void MqttClient::callback(char* in_topic, uint8_t* payload, unsigned int length) {
-  DynamicJsonBuffer jsonBuffer(MQTT_BUFFER_SIZE);
-  JsonObject& root = jsonBuffer.parseObject(payload);
-  if (!root.success()) {
+  JsonDocument doc;
+  DeserializationError error = deserializeJson(doc, payload, length);
+  if (error) {
     Serial.println("MQTT json parse error!");
     return;
   }
   if (strcmp(in_topic,topic.c_str())==0){
-    String newMsg = String((const char*)root["message"]);
+    String newMsg = String((const char*)doc["message"]);
     msg += " " + newMsg;
     Serial.println("MQTT msg json parse finished! " + newMsg);
     return;
   }
   if (strcmp(in_topic,faceTopic.c_str())==0){
     for(byte i=0; i<8; i++){
-       panelFace[i].faceType = (byte)root["panels"][i]["t"];
-       panelFace[i].percent = (byte)root["panels"][i]["p"];
-       String str = root["panels"][i]["c"].as<String>();;
+       panelFace[i].faceType = (byte)doc["panels"][i]["t"];
+       panelFace[i].percent = (byte)doc["panels"][i]["p"];
+       String str = doc["panels"][i]["c"].as<String>();
        panelFace[i].character = str.length() > 0 ? str.charAt(0) : ' ';
     }
     faceModified = true;
